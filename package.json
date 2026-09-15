@@ -13,6 +13,7 @@
     "@supabase/supabase-js": "^2.116.0",
     "jszip": "^3.10.2",
     "liblouis": "^0.4.0",
+    "lucide-react": "^1.46.0",
     "mupdf": "^1.28.1",
     "next": "16.3.5",
     "react": "19.2.8",
