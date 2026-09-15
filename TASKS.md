@@ -15,15 +15,15 @@ on top of it.
 
 Goal: a running Next.js app connected to Supabase, with no pipeline logic yet.
 
-- [ ] Init Next.js app (App Router)
-- [ ] Connect Supabase project (env vars per `.env.example`)
-- [ ] Create `jobs` and `regions` tables per `docs/data-model.md` (skip `edits` table
+- [x] Init Next.js app (App Router)
+- [x] Connect Supabase project (env vars per `.env.example`)
+- [x] Create `jobs` and `regions` tables per `docs/data-model.md` (skip `edits` table
       for now — optional, add later if wanted)
-- [ ] Confirm a route handler can read/write a row in `jobs` end to end (trivial
+- [x] Confirm a route handler can read/write a row in `jobs` end to end (trivial
       test route, delete once confirmed)
-- [ ] Install and confirm imports resolve for: MuPDF bindings, liblouis bindings,
+- [x] Install and confirm imports resolve for: MuPDF bindings, liblouis bindings,
       three.js, Zod, Gemini SDK/client
-- [ ] Do NOT install Drizzle yet (per AGENTS.md §9 — only add if the plain Supabase
+- [x] Do NOT install Drizzle yet (per AGENTS.md §9 — only add if the plain Supabase
       client genuinely becomes insufficient)
 
 **Phase 0 is done when:** the app runs locally, a job row can be created and read
@@ -35,24 +35,24 @@ back from the DB, and every core dependency imports without error.
 
 Goal: Stage 1 and Stage 2 from `docs/pipeline.md` working end to end.
 
-- [ ] Upload route: accepts a PDF, enforces `MAX_PDF_PAGES` (reject with clear
+- [x] Upload route: accepts a PDF, enforces `MAX_PDF_PAGES` (reject with clear
       message if exceeded — see `docs/testing-scope.md`)
-- [ ] Enforce `MAX_UPLOAD_SIZE_MB` (7 MB) before any processing starts — reject
+- [x] Enforce `MAX_UPLOAD_SIZE_MB` (7 MB) before any processing starts — reject
       over-cap files immediately, don't let them reach MuPDF/Gemini
-- [ ] Enforce `RATE_LIMIT_UPLOADS_PER_IP` (5) as a basic abuse guard on the upload
+- [x] Enforce `RATE_LIMIT_UPLOADS_PER_IP` (5) as a basic abuse guard on the upload
       route — see `AGENTS.md` §5
-- [ ] Create a `jobs` row on upload, status `processing`
-- [ ] Page raster via MuPDF — one image per page
-- [ ] Confirm text-layer presence per page (`has_text_layer` flag) — flag pages with
+- [x] Create a `jobs` row on upload, status `processing`
+- [x] Page raster via MuPDF — one image per page
+- [x] Confirm text-layer presence per page (`has_text_layer` flag) — flag pages with
       no text layer for the OCR fallback path, don't silently proceed as if they have
       one
-- [ ] Gemini Call Type A: region classification per page — bounding box + type label
+- [x] Gemini Call Type A: region classification per page — bounding box + type label
       ONLY (text / diagram / table). See `AGENTS.md` §4 — verify the response
       contains no transcribed text content
-- [ ] Validate classification response with Zod before persisting; on failure retry
+- [x] Validate classification response with Zod before persisting; on failure retry
       up to `MAX_GEMINI_VALIDATION_RETRIES` (3) times before failing that page with a
       clear message (see `AGENTS.md` §4)
-- [ ] Create one `regions` row per detected region, `review_status: pending`
+- [x] Create one `regions` row per detected region, `review_status: pending`
 - [ ] Job status moves toward `ready_for_review` once all pages are classified (full
       transition happens after Phase 2-4 also complete per region)
 

@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:phase1": "node --experimental-transform-types --test tests/phase1/classification.test.ts tests/phase1/pdf.test.ts tests/phase1/prompt.test.ts tests/phase1/upload-handler.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.22.0",
