@@ -68,6 +68,27 @@ PDF upload
 - Then: pass directly to liblouis for Grade 1/2 braille translation. No LLM call
   anywhere in this stage under normal (text-layer-present) conditions.
 
+Phase 2 implementation details:
+- Region boxes reference the centered 1000x1000 page raster. Rendering and extraction
+  share one transform; extraction includes characters whose centers lie inside both
+  axes of the box, accounting for rotation, page padding, and CropBox offsets.
+- English UEB uses liblouis's `en-ueb-g1.ctb` / `en-ueb-g2.ctb` tables and Unicode
+  braille display table. `BRAILLE_GRADE` defaults to 2; set it to 1 for uncontracted
+  braille. This stage does not paginate or apply physical export layout.
+- Scanned pages use a separate local Tesseract OCR path. It rerenders only the region
+  at up to 2000x2000 pixels and loads bundled English language data, with no Gemini
+  request or runtime language download. Each OCR operation is awaited in the same
+  upload request; worker threads are computation isolation, not a background queue.
+- OCR times out after 60 seconds per region. Empty results and confidence below 60
+  fail explicitly. This threshold is a heuristic, not proof of accuracy; every OCR
+  success carries a human-review warning. The worker and its nested OCR worker are
+  terminated on completion/failure/timeout, including initialization failure.
+- A page with a real text layer never silently falls back to OCR when an individual
+  box extracts no text. Such regions fail with a clear message. Mixed pages whose
+  text is partly scanned need clearer input or future region-specific OCR support.
+- Results and per-region failures use the text contract in `docs/data-model.md`.
+  Failed regions do not prevent processing the remaining regions/pages.
+
 ## Stage 3b — Table regions
 
 - First, determine: is this a real text-based table (extractable via MuPDF) or an

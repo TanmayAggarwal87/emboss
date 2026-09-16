@@ -7,11 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:phase1": "node --experimental-transform-types --test tests/phase1/classification.test.ts tests/phase1/pdf.test.ts tests/phase1/prompt.test.ts tests/phase1/upload-handler.test.ts"
+    "test:phase1": "node --experimental-transform-types --test tests/phase1/classification.test.ts tests/phase1/pdf.test.ts tests/phase1/prompt.test.ts tests/phase1/upload-handler.test.ts",
+    "test:phase2": "node --conditions=react-server --experimental-transform-types --test tests/phase2/*.test.ts",
+    "verify:phase2": "node --conditions=react-server --experimental-transform-types scripts/verify-phase2.ts"
   },
   "dependencies": {
     "@google/genai": "^2.22.0",
     "@supabase/supabase-js": "^2.116.0",
+    "@tesseract.js-data/eng": "^1.0.0",
     "jszip": "^3.10.2",
     "liblouis": "^0.4.0",
     "lucide-react": "^1.46.0",
@@ -19,6 +22,8 @@
     "next": "16.3.5",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "server-only": "^0.0.1",
+    "tesseract.js": "^7.0.0",
     "three": "^0.186.0",
     "uuid": "^14.0.2",
     "zod": "^4.6.5"

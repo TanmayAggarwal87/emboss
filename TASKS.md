@@ -66,12 +66,14 @@ before moving on.
 
 Goal: Stage 3a from `docs/pipeline.md`.
 
-- [ ] MuPDF text extraction scoped to a text region's bounding box
-- [ ] liblouis integration: plain text → Grade 1/2 braille
-- [ ] Store result in `regions.extracted_data` for text regions
-- [ ] OCR fallback path implemented separately for the no-text-layer case (keep this
+- [x] MuPDF text extraction scoped to a text region's bounding box
+- [x] liblouis integration: plain text → Grade 1/2 braille
+- [x] Store result in `regions.extracted_data` for text regions
+- [x] OCR fallback path implemented separately for the no-text-layer case (keep this
       code path clearly separate from the normal path per `docs/pipeline.md` Stage 3a)
-- [ ] Confirm zero Gemini calls happen anywhere in this phase under normal conditions
+- [x] Confirm zero Gemini calls happen anywhere in this phase under normal conditions
+
+Verification evidence and repeatable commands: `docs/phase2-verification.md`.
 
 **Phase 2 is done when:** a text region from your test PDF produces correct braille
 output, verified against a known-correct braille reference for the same text if

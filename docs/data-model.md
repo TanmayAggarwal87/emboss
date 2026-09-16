@@ -64,9 +64,42 @@ just don't reach for a persistent storage bucket to solve it, per AGENTS.md §5.
 | `type` | enum | `text` \| `diagram` \| `table` |
 | `bounding_box` | jsonb | `{x, y, width, height}` from Stage 2 classification |
 | `review_status` | enum | `pending` \| `approved` \| `edit_requested` \| `rejected` |
-| `extracted_data` | jsonb | text string (text regions), structured table data (table regions), or structured diagram data from Gemini Call Type B (diagram regions) — see Stage 3c in `docs/pipeline.md` |
+| `extracted_data` | jsonb | text processing result (text regions; contract below), structured table data (table regions), or structured diagram data from Gemini Call Type B (diagram regions) — see Stage 3c in `docs/pipeline.md` |
 | `geometry` | jsonb, nullable | only for diagram regions — the validated geometry/element state, structure TBD (see below) |
 | `created_at` / `updated_at` | timestamp | |
+
+### Text region result (Phase 2)
+
+`regions.extracted_data` stores a discriminated result, typed in
+`src/lib/phase2/types.ts`. Successful text results retain both the source and braille:
+
+```ts
+{
+  kind: "text",
+  status: "processed",
+  source: "text_layer" | "ocr",
+  plain_text: string,
+  braille: string, // Unicode six-dot braille; ordinary spaces and newlines retained
+  braille_grade: 1 | 2,
+  braille_code: "UEB",
+  translation_table: string,
+  liblouis_version: string,
+  ocr_confidence: number | null,
+  warnings: string[]
+}
+```
+
+A failed region instead stores `{ kind: "text", status: "failed", error: { code,
+message } }`. Processing failure is not human rejection: `review_status` remains
+`pending` in both cases. Do not treat a pending failed region as usable output.
+Tables and diagrams still have `extracted_data: null` until their own phases.
+No schema migration is required for these JSON values.
+
+Phase 2 runs within the upload request before MuPDF is closed. The response includes
+these results per region and `text_processing: "complete" | "partial_failure"` on
+classified pages. Partial failures return HTTP 207; if the document has only failed
+text regions, its job is marked `failed` and HTTP 422 is returned. Successful jobs
+remain `processing`; review readiness is deferred to the later pipeline phases.
 
 ### `edits` (optional — only if you want an edit history, not required for v1 function)
 | Column | Type | Notes |

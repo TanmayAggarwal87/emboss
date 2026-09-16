@@ -5,6 +5,9 @@ import { openPdf } from "@/lib/phase1/pdf";
 import { UploadRateLimiter } from "@/lib/phase1/rate-limit";
 import { SupabaseJobRepository } from "@/lib/phase1/repository";
 import { createUploadHandler } from "@/lib/phase1/upload-handler";
+import { getBrailleGrade } from "@/lib/phase2/config";
+import { LocalTextRecognizer } from "@/lib/phase2/ocr";
+import { TextRegionProcessor } from "@/lib/phase2/text-processor";
 
 export const runtime = "nodejs";
 
@@ -19,6 +22,7 @@ export async function POST(request: Request): Promise<Response> {
       openPdf,
       classifier: new GeminiRegionClassifier(),
       repository: new SupabaseJobRepository(),
+      textProcessor: new TextRegionProcessor(getBrailleGrade(), new LocalTextRecognizer()),
     });
 
     return handler(request);

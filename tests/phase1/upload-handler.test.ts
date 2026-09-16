@@ -134,6 +134,8 @@ function createHarness(
   const pageCount = options.pageCount ?? 2;
   const document: PdfDocumentHandle = {
     pageCount,
+    extractTextRegion() { return "fixture text"; },
+    rasterizeRegion() { return new Uint8Array(); },
     rasterizePage(pageIndex: number): RasterizedPage {
       return {
         pageNumber: pageIndex + 1,
@@ -190,6 +192,13 @@ function createHarness(
       },
       classifier,
       repository,
+      textProcessor: {
+        async process() {
+          return { kind: "text", status: "processed", source: "text_layer", plain_text: "fixture text",
+            braille: "⠋", braille_grade: 2, braille_code: "UEB", translation_table: "en-ueb-g2.ctb",
+            liblouis_version: "test", ocr_confidence: null, warnings: [] };
+        },
+      },
     }),
     createdJobs,
     insertedRegions,

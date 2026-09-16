@@ -1,3 +1,5 @@
+import type { TextRegionResult } from "../phase2/types.ts";
+
 export type RegionType = "text" | "diagram" | "table";
 
 export type BoundingBox = {
@@ -26,7 +28,10 @@ export type PersistedRegion = {
   type: RegionType;
   bounding_box: BoundingBox;
   review_status: "pending";
+  extracted_data?: TextRegionResult | null;
 };
+
+export type RegionToPersist = ClassifiedRegion & { extracted_data?: TextRegionResult };
 
 export type Phase1Config = {
   maxPdfPages: number;
@@ -38,6 +43,8 @@ export type Phase1Config = {
 export interface PdfDocumentHandle {
   readonly pageCount: number;
   rasterizePage(pageIndex: number): RasterizedPage;
+  extractTextRegion(pageIndex: number, box: BoundingBox): string;
+  rasterizeRegion(pageIndex: number, box: BoundingBox): Uint8Array;
   destroy(): void;
 }
 
@@ -53,7 +60,7 @@ export interface JobRepository {
   insertRegions(
     jobId: string,
     pageNumber: number,
-    regions: ClassifiedRegion[],
+    regions: RegionToPersist[],
   ): Promise<PersistedRegion[]>;
   markJobFailed(jobId: string, message: string): Promise<void>;
 }

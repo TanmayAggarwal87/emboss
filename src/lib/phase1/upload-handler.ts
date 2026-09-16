@@ -4,11 +4,13 @@ import {
   UploadError,
 } from "./errors.ts";
 import { getClientIp, UploadRateLimiter } from "./rate-limit.ts";
+import type { TextProcessor } from "../phase2/types.ts";
 import type {
   JobRepository,
   PdfDocumentHandle,
   Phase1Config,
   RegionClassifier,
+  RegionToPersist,
 } from "./types.ts";
 import {
   readValidatedPdf,
@@ -21,6 +23,7 @@ type UploadDependencies = {
   openPdf(bytes: Uint8Array): PdfDocumentHandle;
   classifier: RegionClassifier;
   repository: JobRepository;
+  textProcessor: TextProcessor;
 };
 
 export function createUploadHandler(dependencies: UploadDependencies) {
@@ -64,10 +67,17 @@ export function createUploadHandler(dependencies: UploadDependencies) {
               page,
               dependencies.config.maxGeminiValidationAttempts,
             );
+            const processed: RegionToPersist[] = [];
+            for (const region of classifications) {
+              processed.push(region.type === "text" ? {
+                ...region,
+                extracted_data: await dependencies.textProcessor.process(document, page, region.bounding_box),
+              } : region);
+            }
             const regions = await dependencies.repository.insertRegions(
               jobId,
               pageNumber,
-              classifications,
+              processed,
             );
 
             pages.push({
@@ -75,6 +85,8 @@ export function createUploadHandler(dependencies: UploadDependencies) {
               status: "classified" as const,
               raster: { width: page.width, height: page.height },
               has_text_layer: page.hasTextLayer,
+              text_processing: processed.some((region) => region.extracted_data?.status === "failed")
+                ? "partial_failure" as const : "complete" as const,
               regions,
             });
           } catch (error) {
@@ -88,23 +100,29 @@ export function createUploadHandler(dependencies: UploadDependencies) {
 
         const failedPages = pages.filter((page) => page.status === "failed");
         const allPagesFailed = failedPages.length === document.pageCount;
+        const hasTextFailures = pages.some((page) =>
+          page.status === "classified" && page.text_processing === "partial_failure");
+        const allRegions = pages.flatMap((page) => page.status === "classified" ? page.regions : []);
+        const allTextFailed = !allPagesFailed && allRegions.length > 0 &&
+          allRegions.every((region) => region.type === "text" && region.extracted_data?.status === "failed");
+        const jobFailed = allPagesFailed || allTextFailed;
 
-        if (allPagesFailed) {
+        if (jobFailed) {
           await dependencies.repository.markJobFailed(
             jobId,
-            "No pages could be classified reliably.",
+            allPagesFailed ? "No pages could be classified reliably." : "No text regions could be processed successfully.",
           );
         }
 
         return Response.json(
           {
             job_id: jobId,
-            status: allPagesFailed ? "failed" : "processing",
+            status: jobFailed ? "failed" : "processing",
             page_count: document.pageCount,
             pages,
           },
           {
-            status: allPagesFailed ? 422 : failedPages.length > 0 ? 207 : 201,
+            status: jobFailed ? 422 : failedPages.length > 0 || hasTextFailures ? 207 : 201,
           },
         );
       } finally {

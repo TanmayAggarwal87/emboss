@@ -3,7 +3,7 @@ import "server-only";
 import { getSupabaseAdmin } from "../supabase/admin.ts";
 import { UploadError } from "./errors.ts";
 import type {
-  ClassifiedRegion,
+  RegionToPersist,
   JobRepository,
   PersistedRegion,
 } from "./types.ts";
@@ -30,7 +30,7 @@ export class SupabaseJobRepository implements JobRepository {
   async insertRegions(
     jobId: string,
     pageNumber: number,
-    regions: ClassifiedRegion[],
+    regions: RegionToPersist[],
   ): Promise<PersistedRegion[]> {
     if (regions.length === 0) {
       return [];
@@ -45,9 +45,10 @@ export class SupabaseJobRepository implements JobRepository {
           type: region.type,
           bounding_box: region.bounding_box,
           review_status: "pending" as const,
+          extracted_data: region.extracted_data ?? null,
         })),
       )
-      .select("id, type, bounding_box, review_status");
+      .select("id, type, bounding_box, review_status, extracted_data");
 
     if (error) {
       throw new UploadError(

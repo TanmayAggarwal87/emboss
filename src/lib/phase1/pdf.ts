@@ -1,12 +1,12 @@
 import * as mupdf from "mupdf";
 
 import { UploadError } from "./errors.ts";
+import { CLASSIFICATION_RASTER_SIZE, classificationTransform, validateRasterBox } from "./pdf-coordinates.ts";
 import type {
+  BoundingBox,
   PdfDocumentHandle,
   RasterizedPage,
 } from "./types.ts";
-
-const CLASSIFICATION_RASTER_SIZE = 1000;
 
 export function openPdf(bytes: Uint8Array): PdfDocumentHandle {
   let document: mupdf.Document;
@@ -75,26 +75,73 @@ class MuPdfDocumentHandle implements PdfDocumentHandle {
   destroy(): void {
     this.document.destroy();
   }
+
+  extractTextRegion(pageIndex: number, box: BoundingBox): string {
+    validateRasterBox(box);
+    const page = this.document.loadPage(pageIndex);
+    try {
+      const [scale, , , , offsetX, offsetY] = classificationTransform(page);
+      const structuredText = page.toStructuredText("preserve-whitespace");
+      try {
+        const blocks: string[] = [];
+        let lines: string[] = [];
+        let line = "";
+        structuredText.walk({
+          beginTextBlock() { lines = []; },
+          beginLine() { line = ""; },
+          onChar(character, _origin, _font, _size, quad) {
+            const x = (quad[0] + quad[2] + quad[4] + quad[6]) / 4 * scale + offsetX;
+            const y = (quad[1] + quad[3] + quad[5] + quad[7]) / 4 * scale + offsetY;
+            // Character centers scope both axes; copy(start,end) instead selects
+            // a reading-order range and can leak text from neighboring columns.
+            if (x >= box.x && x < box.x + box.width && y >= box.y && y < box.y + box.height) {
+              line += character;
+            }
+          },
+          endLine() { if (line.trim()) lines.push(line.trim()); },
+          endTextBlock() { if (lines.length) blocks.push(lines.join("\n")); },
+        });
+        return blocks.join("\n\n");
+      } finally {
+        structuredText.destroy();
+      }
+    } finally {
+      page.destroy();
+    }
+  }
+
+  rasterizeRegion(pageIndex: number, box: BoundingBox): Uint8Array {
+    validateRasterBox(box);
+    const page = this.document.loadPage(pageIndex);
+    try {
+      // Rerender the source crop at twice classification resolution for OCR.
+      // The output is bounded to 2000x2000 pixels regardless of PDF page size.
+      const [scale, , , , offsetX, offsetY] = classificationTransform(page);
+      const transform: mupdf.Matrix = [scale * 2, 0, 0, scale * 2,
+        (offsetX - box.x) * 2, (offsetY - box.y) * 2];
+      const pixmap = new mupdf.Pixmap(mupdf.ColorSpace.DeviceRGB,
+        [0, 0, Math.ceil(box.width * 2), Math.ceil(box.height * 2)], false);
+      try {
+        pixmap.clear(255);
+        const device = new mupdf.DrawDevice(mupdf.Matrix.identity, pixmap);
+        try {
+          page.run(device, transform);
+          device.close();
+          return Uint8Array.from(pixmap.asPNG());
+        } finally {
+          device.destroy();
+        }
+      } finally {
+        pixmap.destroy();
+      }
+    } finally {
+      page.destroy();
+    }
+  }
 }
 
 function renderClassificationRaster(page: mupdf.Page): mupdf.Pixmap {
-  const [x0, y0, x1, y1] = page.getBounds();
-  const pageWidth = x1 - x0;
-  const pageHeight = y1 - y0;
-  const scale = Math.min(
-    CLASSIFICATION_RASTER_SIZE / pageWidth,
-    CLASSIFICATION_RASTER_SIZE / pageHeight,
-  );
-  const offsetX = (CLASSIFICATION_RASTER_SIZE - pageWidth * scale) / 2;
-  const offsetY = (CLASSIFICATION_RASTER_SIZE - pageHeight * scale) / 2;
-  const transform: mupdf.Matrix = [
-    scale,
-    0,
-    0,
-    scale,
-    offsetX - x0 * scale,
-    offsetY - y0 * scale,
-  ];
+  const transform = classificationTransform(page);
   const pixmap = new mupdf.Pixmap(
     mupdf.ColorSpace.DeviceRGB,
     [0, 0, CLASSIFICATION_RASTER_SIZE, CLASSIFICATION_RASTER_SIZE],
