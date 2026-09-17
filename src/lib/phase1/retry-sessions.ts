@@ -10,6 +10,7 @@ export type ClassifiedPage = {
   text_processing: ProcessingStatus;
   table_processing: ProcessingStatus;
   diagram_processing: ProcessingStatus;
+  geometry_processing?: ProcessingStatus;
   regions: PersistedRegion[];
 };
 export type FailedPage = {
@@ -37,6 +38,7 @@ export type RetrySession = {
   retries: number;
   retryNotBefore: number;
   failedInDatabase: boolean;
+  reviewReady?: boolean;
 };
 
 // Process-local, bounded temporary storage. Completed sessions keep response

@@ -9,6 +9,7 @@ export type DiagramRegionResult =
       data: SupportedDiagramData;
       needs_data_review: boolean;
       warnings: string[];
+      geometry_processing?: { status: "validated" } | { status: "failed"; error: { code: string; message: string } };
     }
   | { kind: "diagram"; status: "failed"; error: { code: string; message: string } };
 

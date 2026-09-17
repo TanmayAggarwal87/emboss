@@ -12,6 +12,8 @@ import { TextRegionProcessor } from "../phase2/text-processor.ts";
 import { TableRegionProcessor } from "../phase3/table-processor.ts";
 import { DiagramRegionProcessor } from "../phase4/diagram-processor.ts";
 import { GeminiDiagramExtractor } from "../phase4/gemini.ts";
+import { DeterministicGeometryProcessor } from "../phase5/generate.ts";
+import { getPhysicalProfile } from "../phase5/profile.ts";
 
 // Route bundles and development reloads share one process-local session/guard.
 // A different process must return 410 rather than pretending it has the PDF.
@@ -30,5 +32,6 @@ export function getUploadDependencies(): UploadDependencies & { sessions: RetryS
     textProcessor: new TextRegionProcessor(grade, new LocalTextRecognizer()),
     tableProcessor: new TableRegionProcessor(grade),
     diagramProcessor: new DiagramRegionProcessor(new GeminiDiagramExtractor()),
+    geometryProcessor: new DeterministicGeometryProcessor(getPhysicalProfile(process.env), grade),
   };
 }

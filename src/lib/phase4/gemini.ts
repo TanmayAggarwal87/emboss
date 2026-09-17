@@ -8,19 +8,33 @@ import { extractWithValidationRetries } from "./schema.ts";
 import type { DiagramExtractor } from "./types.ts";
 
 const nullableString: Schema = { type: Type.STRING, nullable: true };
+const independentAxis: Schema = {
+  anyOf: [
+    { type: Type.OBJECT, properties: {
+      type: { type: Type.STRING, enum: ["categorical"] },
+      values: { type: Type.ARRAY, minItems: "1", items: { type: Type.STRING } },
+    }, required: ["type", "values"] },
+    { type: Type.OBJECT, properties: {
+      type: { type: Type.STRING, enum: ["numeric"] },
+      values: { type: Type.ARRAY, minItems: "1", items: { type: Type.NUMBER, nullable: true } },
+    }, required: ["type", "values"] },
+  ],
+};
 const supportedSchema = (chartType: string, minItems: string): Schema => ({
   type: Type.OBJECT,
   properties: {
     chart_type: { type: Type.STRING, enum: [chartType] },
     axis_labels: { type: Type.OBJECT, properties: { x: nullableString, y: nullableString }, required: ["x", "y"] },
+    independent_axis: independentAxis,
     data_points: { type: Type.ARRAY, minItems, items: {
       type: Type.OBJECT,
       properties: { label: { type: Type.STRING }, value: { type: Type.NUMBER, nullable: true } },
       required: ["label", "value"],
     } },
     series_label: nullableString,
+    ...(chartType === "bar_chart" ? { orientation: { type: Type.STRING, enum: ["vertical", "horizontal"] } } : {}),
   },
-  required: ["chart_type", "axis_labels", "data_points", "series_label"],
+  required: ["chart_type", "axis_labels", "data_points", "series_label", "independent_axis", ...(chartType === "bar_chart" ? ["orientation"] : [])],
 });
 
 const responseSchema: Schema = {

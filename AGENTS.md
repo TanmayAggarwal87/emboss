@@ -74,8 +74,9 @@ layer, never from Gemini, because MuPDF is free and exact and Gemini is neither.
 
 **Call type B — diagram data extraction:**
 Input: the cropped image of a single region already classified as `diagram`.
-Output: structured JSON describing what the diagram shows — chart type, data points,
-axis labels, legend/series labels. NOT geometry, NOT coordinates, NOT mm values.
+Output: structured JSON describing what the diagram shows — chart type, bar
+orientation, data points, semantic independent-axis values/type, axis labels and
+legend/series labels. NOT geometry, NOT rendering coordinates, NOT mm dimensions.
 Deterministic code turns this JSON into validated geometry.
 
 Never combine these two calls. Never let classification also transcribe. Never let
@@ -120,7 +121,8 @@ response just to avoid a failure state.
 - If the minimum legal size for a diagram's data exceeds the max plate size, fail
   explicitly with a clear message. Never silently shrink geometry below BANA minimums
   to force a fit.
-- All dimensional constants live in `docs/bana-standards.md`. Do not hardcode a BANA
+- All dimensional constants live in `docs/bana-standards.md`, with BANA/NLS constraints
+  separated from the approved Emboss FDM manufacturing profile. Do not hardcode a BANA
   number anywhere except by referencing that file — if a value you need isn't there,
   stop and ask rather than estimating it.
 
@@ -141,8 +143,8 @@ response just to avoid a failure state.
 - Every edit result is re-run through the same deterministic BANA validation as the
   original generation before being shown again. An edit is never trusted just because
   a human requested it.
-- Element ID scheme is not finalized yet — check `docs/data-model.md` before
-  implementing; if it's still undefined there, ask before inventing one ad hoc.
+- Element IDs follow the approved deterministic scheme in `docs/data-model.md`.
+  Preserve them across validation, preview and future edits/export.
 
 ## 9. Tech stack
 

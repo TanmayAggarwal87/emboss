@@ -136,7 +136,8 @@ the source diagram.
 
 ---
 
-## Classification reliability follow-up (2026-09-17)
+## Classification reliability follow-up (20
+26-09-17)
 
 - [x] Retry only Call A HTTP 429/503 with bounded 30/90-second backoff, disabling
       SDK retries and preserving the separate Zod validation budget.
@@ -159,30 +160,37 @@ No live model traffic was used; deployment/session limitations are documented in
 Goal: Stage 3c Steps 3-4 from `docs/pipeline.md`. This is the highest-risk phase —
 go slowly and re-check against `docs/bana-standards.md` constantly.
 
-- [ ] Dynamic scale computation: given extracted data + BANA minimums (§3, §5, §6) +
+- [x] Dynamic scale computation: given extracted data + BANA minimums (§3, §5, §6) +
       max plate size (§1 / env config), compute the graphic element scale
       deterministically
-- [ ] Explicit failure path: if minimum-legal layout exceeds max plate size, fail
+- [x] Explicit failure path: if minimum-legal layout exceeds max plate size, fail
       with a clear message — do not shrink below BANA minimums (`docs/bana-standards.md`
       §10)
-- [ ] Bar chart geometry: bars at correct width/height/spacing per §5, textured (not
-      color-coded) category differentiation
-- [ ] Line graph geometry: single-series only, correct line height hierarchy (data >
+- [x] Bar chart geometry: bars at correct width/height/spacing per §5; deterministic
+      single-series texture and braille category labels, never color-only distinction
+- [x] Line graph geometry: single-series only, correct line height hierarchy (data >
       axis > grid, §3), point-symbol shapes at correct size (§6)
-- [ ] Braille label geometry: constant dimensions, never scaled with the graphic
+- [x] Braille label geometry: constant dimensions, never scaled with the graphic
       (§10) — this is the most likely place to introduce a silent bug, double-check it
-- [ ] Deterministic validator: checks every generated element against
+- [x] Deterministic validator: checks every generated element against
       `docs/bana-standards.md` spacing/size rules; a design with violations does not
       proceed to preview
-- [ ] Element addressing: assign the stable ID scheme once defined (see
-      `docs/data-model.md`, "Element ID scheme" — confirm this is settled before
-      building this checklist item; if still undefined, stop and settle it first)
-- [ ] Store validated geometry in `regions.geometry`
+- [x] Element addressing: approved stable, deterministic, human-readable IDs
+      documented in `docs/data-model.md` and retained in geometry/mesh addressing
+- [x] Store validated geometry in `regions.geometry`
 
 **Phase 5 is done when:** a bar chart and a line graph from your test PDF each
 produce geometry that passes validation with zero violations, and a manually
 constructed "impossible" test case (e.g. 40 bars) correctly fails with a clear
 message instead of producing out-of-spec geometry.
+
+Verified 2026-09-17: 26 Phase 5 tests and 75 regression tests passed, alongside
+lint, strict TypeScript and the production build. Zero-Gemini fixture geometry
+passed with no violations; 40 bars failed with `GEOMETRY_TOO_DENSE`. Supabase
+read-back matched two geometry rows, repeat insertion was idempotent, readiness
+was confirmed, and synthetic rows were removed. Top-view artifacts were inspected.
+Physical print/slicer testing and expert tactile review remain unverified; no
+Phase 6 UI or export implementation was added.
 
 ---
 

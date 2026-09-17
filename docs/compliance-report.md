@@ -1,6 +1,6 @@
 # Emboss — Compliance & Validation Report
 
-`[2026-09-17]: Phase 4 live bar/line data extraction and Supabase verification passed alongside 53 automated tests; physical conformance and complete v1 end-to-end output remain unverified.`
+`[2026-09-17]: Phase 5 software geometry validation and Supabase verification passed alongside 101 automated tests; physical print conformance and complete v1 end-to-end output remain unverified.`
 
 ---
 
@@ -38,20 +38,21 @@ in `docs/bana-standards.md` each row checks against. Do not estimate a "should b
 value — only record what the code actually generated and whether the validator
 accepted it.
 
-| Parameter | Emboss generated value | BANA standard (see `bana-standards.md` §) | Conforms? | Verified how / when |
+| Parameter | Emboss generated value | Source (`bana-standards.md`) | Software check | Evidence, 2026-09-17 |
 |---|---|---|---|---|
-| Data/primary line height | _unset_ | §3, 0.80–1.00 mm | _unset_ | _unset_ |
-| Axis line height | _unset_ | §3, 0.50–0.60 mm | _unset_ | _unset_ |
-| Grid line height | _unset_ | §3, 0.20–0.30 mm | _unset_ | _unset_ |
-| Minimum element separation | _unset_ | §4, 3.18 mm | _unset_ | _unset_ |
-| Label clearance | _unset_ | §4, 3.18–6.35 mm | _unset_ | _unset_ |
-| Bar width (min/max) | _unset_ | §5, 9.53–25.4 mm | _unset_ | _unset_ |
-| Line-graph point-symbol base width | _unset_ | §6, 3.0–4.0 mm | _unset_ | _unset_ |
-| Table column separation (3-cell rule) | _unset_ | §8, ~18.6 mm | _unset_ | _unset_ |
-| Table border heights (if used) | _unset_ | §8 border table | _unset_ | _unset_ |
-| Page/plate margin | _unset_ | §1, 6.35 mm | _unset_ | _unset_ |
+| Data / axis / grid rise | 0.9 / 0.55 / 0.25 mm | Emboss profile §11; relative hierarchy §3 | Pass | Generated line fixture, mesh/validator tests |
+| Data / axis / grid width | 1.6 / 1.2 / 0.8 mm | Emboss profile §11, not prescribed BANA widths | Pass | Profile and element validation |
+| Base thickness | 2 mm | Emboss profile §11, not BANA | Pass | Actual mesh bounds |
+| Plate footprint | Bar 110.00 × 82.02; line 99.71 × 83.52 mm | Emboss profile §11, maximum 180 × 180 | Pass | Diagnostic and mesh tests |
+| Point-symbol size | 3 mm square for plotted graph points | Accessibility §6, not generic 6 mm symbols | Pass | Generated line fixture |
+| Braille dot height / diameter | 0.48 / 1.44 mm | BANA/NLS paper profile §1 | Pass | Actual mesh dimensions |
+| Braille dot / cell / line pitch | 2.34 / 6.2 / 10 mm | BANA/NLS paper profile §1 | Pass | Fixed profile and mesh tests |
+| Separation, anchored labels, bar dimensions, margins | Zero validator violations on both fixtures | Accessibility §§1/4/5; intentional joins excepted | Pass for these fixtures | Layout and mutation tests; not a physical measurement |
+| Physical table borders | Not generated | Manufacturing profile §8 | Unverified | Text tables only |
 
-No geometry validator has run yet. Physical rows above intentionally remain unset.
+These are deterministic software measurements, not measurements from a printed
+sample. Profile dimensions are not represented as BANA requirements. Physical
+readability, printer tolerances and specialist approval remain unverified.
 
 ### Phase 3 braille text-layout evidence (not physical measurements)
 
@@ -152,6 +153,23 @@ because a later run succeeded — both are evidence.
 
 ## C. Known limitations / provisional results
 
+### Phase 5 evidence — 2026-09-17
+
+- 26 Phase 5 tests plus 75 earlier-phase/recovery tests passed; lint, strict
+  TypeScript and production build passed. No live Gemini requests were made.
+- Known semantic data from the two-page chart fixture generated valid bar and line
+  geometry. Source PDF and top-view braille/texture artifacts were produced; top
+  views were visually inspected. A 40-bar input failed with `GEOMETRY_TOO_DENSE`.
+- Initial sandboxed database access failed before job creation. Authorized
+  verification then read back exactly two matching geometry rows, confirmed
+  repeat inserts added no duplicates and job status was `ready_for_review`, and
+  removed its synthetic job/regions. No PDF/raster bytes were stored.
+- The updated Call B orientation/numeric-axis contract has offline tests, not a
+  new live extraction accuracy check. Conservative layout can reject long labels,
+  crowded charts or non-monotonic numeric positions; no optimal-packing claim.
+- Additive closed solids overlap intentionally. Slicer union behavior and printed
+  legibility are untested; preview, editing and STL export are later phases.
+
 - Synthetic table fixtures are a small sample. No new live classification accuracy
   test was run for Phase 3; fixed boxes deliberately avoided Gemini quota use.
 - Clear merged/incomplete grids and styled multi-header cases are rejected, but
@@ -167,7 +185,8 @@ because a later run succeeded — both are evidence.
   and flagged for data review before geometry can be generated.
 - Guide dots and braille layout have not been tested with an embosser, physical
   print, specialist transcriber, or blind reader. Cell-space checks are not mm checks.
-- Geometry, review, edits, exports, and the full v1 acceptance run remain pending.
+- Physical geometry validation, review, edits, exports, and the full v1 acceptance
+  run remain pending; software geometry generation is implemented.
 
 ---
 

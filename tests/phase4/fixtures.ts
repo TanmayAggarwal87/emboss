@@ -3,9 +3,9 @@ import type { SupportedDiagramData } from "../../src/lib/phase4/schema.ts";
 
 export const CHART_BOX = { x: 40, y: 50, width: 920, height: 920 };
 export const EXPECTED_CHARTS: SupportedDiagramData[] = [
-  { chart_type: "bar_chart", axis_labels: { x: "Month", y: "Count" }, series_label: "Monthly totals",
+  { chart_type: "bar_chart", orientation: "vertical", independent_axis: { type: "categorical", values: ["Jan", "Feb", "Mar"] }, axis_labels: { x: "Month", y: "Count" }, series_label: "Monthly totals",
     data_points: [{ label: "Jan", value: 10 }, { label: "Feb", value: 20 }, { label: "Mar", value: 30 }] },
-  { chart_type: "line_graph_single_series", axis_labels: { x: "Month", y: "Count" }, series_label: "Monthly trend",
+  { chart_type: "line_graph_single_series", independent_axis: { type: "categorical", values: ["Jan", "Feb", "Mar"] }, axis_labels: { x: "Month", y: "Count" }, series_label: "Monthly trend",
     data_points: [{ label: "Jan", value: 5 }, { label: "Feb", value: 15 }, { label: "Mar", value: 10 }] },
 ];
 

@@ -206,13 +206,20 @@ line line graph — including pie charts, multi-series line graphs, scatter plot
 diagrams of physical/biological/mechanical systems, maps, or any chart you are not
 confident fits the two supported types. Do not force-fit an ambiguous chart into a
 supported type. If you classify as "unsupported", stop there and return only the
-"chart_type" field.
+"chart_type" field. Grouped or stacked/multi-series bars, logarithmic axes, and
+broken axes are unsupported in v1; do not try to represent them approximately.
 
 Step 2 — if the chart type is "bar_chart" or "line_graph_single_series", extract:
 - axis_labels: the x-axis and y-axis labels/titles as they appear, verbatim
 - data_points: an ordered array of { label, value } as shown by the chart — read
   values as precisely as the chart allows; if a value is not clearly readable, use
   null for that value rather than estimating one
+- orientation: for bar charts only, "vertical" or "horizontal"
+- independent_axis: ordered source values aligned one-to-one with data_points, as
+  { "type": "categorical", "values": ["..."] } or
+  { "type": "numeric", "values": [<number or null>, ...] }. Use x for vertical
+  bars and line graphs, and y for horizontal bars. Never guess an unreadable number.
+- Omit `orientation` entirely for line graphs.
 - series_label: the label for this data series, if named (e.g. a legend entry or
   chart title identifying what's plotted) — null if none is shown
 
@@ -234,7 +241,9 @@ STRICT RULES — read carefully, these are not optional:
 Output format (JSON):
 {
   "chart_type": "bar_chart" | "line_graph_single_series" | "unsupported",
+  "orientation": "vertical" | "horizontal",
   "axis_labels": { "x": "<string or null>", "y": "<string or null>" },
+  "independent_axis": { "type": "categorical" | "numeric", "values": ["<string>" | <number> | null] },
   "data_points": [ { "label": "<string>", "value": <number or null> } ],
   "series_label": "<string or null>"
 }
@@ -245,7 +254,9 @@ If chart_type is "unsupported", return only:
 Example (illustrative only — do not reuse these exact values):
 {
   "chart_type": "bar_chart",
+  "orientation": "vertical",
   "axis_labels": { "x": "Month", "y": "Rainfall (mm)" },
+  "independent_axis": { "type": "categorical", "values": ["Jan", "Feb", "Mar"] },
   "data_points": [
     { "label": "Jan", "value": 42 },
     { "label": "Feb", "value": 38 },
@@ -267,6 +278,10 @@ Example (illustrative only — do not reuse these exact values):
   every object level, including extra data on an `unsupported` response. Preserve
   source labels and point order. Source units in labels (e.g. `Rainfall (mm)` above)
   describe chart data; they are not generated tactile dimensions.
+- A `null` numeric independent-axis value is honest output and must set data review;
+  categorical values must be non-empty strings. Independent-axis values must align
+  one-to-one with `data_points`, preserving source order. `orientation` is required
+  only for bar charts and must be absent for line graphs.
 
 ---
 
@@ -278,9 +293,9 @@ element. Never raw geometry, never a full regeneration. See `docs/pipeline.md`
 Stage 5a, `AGENTS.md` §8.
 
 **Input:** the reviewer's plain-English instruction + the current geometry state
-(element list with IDs — element ID scheme per `docs/data-model.md`, not finalized
-at time of writing; this prompt must be updated once that scheme is locked, since the
-`element_id` values described to the model below depend on it).
+(element list with deterministic IDs per `docs/data-model.md`, such as `bar-0`,
+`point-0`, `x-axis` and `label-x-0`). Call C remains a future-phase contract;
+its implementation must validate operations against the actual supplied IDs.
 
 **API config:**
 - `responseMimeType: "application/json"`, `responseSchema` set to the shape below

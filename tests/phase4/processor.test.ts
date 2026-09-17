@@ -42,6 +42,18 @@ test("unreadable values stay null and are flagged for review, never converted to
   } finally { document.destroy(); }
 });
 
+test("null numeric independent-axis values are flagged for review", async () => {
+  const document = openPdf(createDiagramFixture());
+  try {
+    const processor = new DiagramRegionProcessor({ async extract() {
+      return { ...EXPECTED_CHARTS[0], independent_axis: { type: "numeric" as const, values: [1, null, 3] } };
+    } });
+    const result = await processor.process(document, 0, CHART_BOX, 1);
+    assert.ok(result.status === "processed");
+    assert.equal(result.needs_data_review, true);
+  } finally { document.destroy(); }
+});
+
 test("bad crop, unsupported figure and validation exhaustion produce distinct per-region errors", async () => {
   const document = openPdf(createDiagramFixture());
   try {

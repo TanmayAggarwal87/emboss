@@ -205,6 +205,27 @@ Phase 4 implements **Steps 1-2 only**:
   `processing`, regions remain `pending`, and geometry stays null. Steps 3-4 and
   the review/export stages remain later work.
 
+## Phase 5 — Deterministic geometry processing
+
+After successful diagram extraction, the Phase 5 processor lays out a
+version-1 `GeometryState` in millimetres and runs deterministic accessibility and
+manufacturing validation. A successful result is persisted as
+`regions.geometry`, with `geometry_processing: { status: "validated" }` in
+`extracted_data` and warnings alongside the extraction result; a region may
+fail geometry while retaining its extracted Phase 4 data and a clear error. The
+processor accepts only aligned numeric/categorical independent-axis data and the
+supported vertical/horizontal bar or single-series line contracts. Null values,
+non-monotonic numeric positions, overlong labels, and dense charts fail rather than
+being guessed, compressed, or braille-scaled.
+
+The default FDM profile is a 180 × 180 mm envelope including margins with a 2 mm
+base. Braille dimensions are immutable NLS dimensions; accessibility constraints
+and manufacturing constraints are reported separately, and software validation is
+not physical certification. Geometry is an additive Three.js group of closed
+solids, including the plate, relief, texture, and braille dots. No UI or export
+feature is implied by this processing stage. The production upload/retry runtime
+always supplies the processor; earlier-phase isolated tests may omit it.
+
 ## Stage 4 — Preview
 
 - Renders the generated mesh (three.js, client-side) alongside the original source

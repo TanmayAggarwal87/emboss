@@ -151,7 +151,7 @@ or Storage bucket is needed:
 ```ts
 {
   kind: "diagram",
-  status: "processed", // chart data extracted; geometry has NOT been generated
+  status: "processed", // chart data extracted; geometry processing is separate
   source: "gemini",
   data: {
     chart_type: "bar_chart" | "line_graph_single_series",
@@ -163,6 +163,10 @@ or Storage bucket is needed:
   warnings: string[]
 }
 ```
+
+When Phase 5 is enabled, successful extraction may additionally produce a
+`geometry_processing` result containing validated `GeometryState` and warnings;
+geometry failure is local to the region and does not discard the extracted data.
 
 The `data` object is strict Zod-validated Call B output. Extra keys at every level,
 non-finite values, empty point labels, and missing fields are rejected. Bar charts
@@ -219,18 +223,25 @@ demo point.
 
 ---
 
-## Element ID scheme for diagram geometry — **not finalized**
+## Phase 5 diagram geometry state and element IDs
 
-This is deliberately left open. The `geometry` field on a `regions` row needs some
-stable, addressable structure so that Stage 5a (edit-prompt) can target specific
-elements — e.g. "move bar_3 left" needs `bar_3` to be a real, stable identifier that
-both the geometry generator and the edit agent agree on.
+`regions.geometry` stores a validated `GeometryState` JSON value (schema version `1`,
+`units: "mm"`), never a mesh blob or mesh file. It contains the validated Phase 4
+source contract, which supports only bar charts and single-series line graphs. The
+independent axis is aligned with the source: numeric or categorical values are
+one-to-one with data points; vertical bars and line graphs use x, horizontal bars use
+y. Graphic dimensions are deterministic and the braille profile is fixed.
 
-**Do not invent this ad hoc mid-implementation.** When this is needed, define it as
-its own short spec (likely a simple convention like `{type}_{index}`, e.g. `bar_1`,
-`axis_x`, `label_2`, `point_3`) and confirm it before wiring the edit agent against
-it, since every downstream piece (geometry generation, validation, edit-prompt
-targeting, re-validation) depends on this staying consistent.
+Element IDs are scoped to one region and are never renumbered by future edits:
+`bar-0`, `point-0`, `data-segment-0`, `x-axis`, `y-axis`, `grid-y-0`, `grid-x-0`,
+`label-x-0`, `label-y-0`, `label-x-title`, `label-y-title`, and `legend-0`.
+`title` is reserved for a future title only when an actual title exists. These IDs
+are semantic addresses preserved in state and in the preview scene graph. The same
+`buildGeometryMesh` group is intended for future preview and export; binary STL does
+not preserve semantic IDs, so do not claim that an STL file does.
+
+Phase 5 uses additive, closed solids (including overlapping solids) and no CSG.
+Slicing and printer-specific checks remain future work.
 
 ---
 
@@ -239,7 +250,8 @@ targeting, re-validation) depends on this staying consistent.
 ```
 upload
   → processing (Stages 1-3 running)
-  → ready_for_review (all regions classified + processed, at least one needs review)
+  → ready_for_review (all pages/regions complete and every diagram has validated geometry;
+    at least one region needs review — never auto-approve)
       → [per region] approved / edit_requested / rejected
       → once all regions are in a terminal per-region state (approved or rejected):
   → exported (Stage 6-7 complete, package generated)

@@ -33,7 +33,27 @@ npm run test:phase2
 npm run test:phase3
 npm run test:phase4
 npm run test:retry
+npm run test:phase5
 ```
+
+Phase 5 deterministic geometry processing is enabled in the upload/retry runtime. It accepts
+validated bar charts and single-series line graphs, producing a millimetre
+`GeometryState` and a Three.js group for future preview/export. It does not yet add
+UI, STL export, or a print/slicing check. Run `npm run test:phase5` for 26 offline
+layout, mesh, validation, profile, persistence-guard and pipeline tests.
+
+Run `npm run verify:phase5 -- --artifacts` for a zero-Gemini bar/line diagnostic
+and temporary source PDF, geometry JSON and top-view SVGs. Add `--database` to
+verify Supabase geometry read-back, idempotence and job readiness; the script
+removes only its synthetic job and rows afterward. No new environment values are
+required: unset plate dimensions default to 180 × 180 mm and thickness to 2 mm.
+
+Known limitations: numeric positions must be distinct and monotonic; null or legacy
+source contracts fail explicitly; dense charts and long labels fail rather than
+shrinking braille; zero-valued bars remain empty but addressable groups. The default
+manufacturing profile targets a 180 × 180 mm plate including margins and a 2 mm base,
+while braille dimensions remain fixed. Accessibility and manufacturing validation
+are software checks and do not certify a physical print.
 
 Phase 4 chart extraction can be checked offline with `npm run verify:phase4`.
 For a capped real Gemini test, run `npm run verify:phase4 -- --live --database`:

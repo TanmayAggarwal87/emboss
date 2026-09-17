@@ -5,6 +5,7 @@ import { RetrySessionStore, type ClassifiedPage, type FailedPage, type RetrySess
 import type { TextProcessor } from "../phase2/types.ts";
 import type { TableProcessor } from "../phase3/types.ts";
 import type { DiagramProcessor } from "../phase4/types.ts";
+import type { GeometryProcessor } from "../phase5/types.ts";
 import type { JobRepository, PdfDocumentHandle, Phase1Config, RegionClassifier, RegionToPersist } from "./types.ts";
 import { readValidatedPdf, validatePageCount } from "./upload-validation.ts";
 
@@ -17,6 +18,7 @@ export type UploadDependencies = {
   textProcessor: TextProcessor;
   tableProcessor: TableProcessor;
   diagramProcessor: DiagramProcessor;
+  geometryProcessor?: GeometryProcessor;
   sessions?: RetrySessionStore;
 };
 
@@ -43,7 +45,7 @@ export function createUploadHandler(dependencies: UploadDependencies) {
       for (let page = 1; page <= document.pageCount; page += 1) {
         await processPage(dependencies, session, document, page, signal);
       }
-      await syncJobStatus(dependencies.repository, session);
+      await syncJobStatus(dependencies.repository, session, !!dependencies.geometryProcessor);
       session.retryNotBefore = sessions.now() + MANUAL_RETRY_COOLDOWN_MS;
       return sessionResponse(session, sessions, false);
     } catch (error) {
@@ -76,7 +78,7 @@ export function createRetryHandler(dependencies: UploadDependencies & { sessions
       if (!failures.length) {
         session.busy = true;
         locked = true;
-        await syncJobStatus(dependencies.repository, session);
+        await syncJobStatus(dependencies.repository, session, !!dependencies.geometryProcessor);
         return sessionResponse(session, sessions, true);
       }
       if (session.retries >= MAX_MANUAL_RETRIES) throw new UploadError(429, "RETRY_LIMIT_REACHED", "This document has reached its three retry-request limit.");
@@ -91,7 +93,7 @@ export function createRetryHandler(dependencies: UploadDependencies & { sessions
       for (const page of failures.sort((a, b) => a.page_number - b.page_number)) {
         await processPage(dependencies, session, document, page.page_number, signal);
       }
-      await syncJobStatus(dependencies.repository, session);
+      await syncJobStatus(dependencies.repository, session, !!dependencies.geometryProcessor);
       session.retryNotBefore = sessions.now() + MANUAL_RETRY_COOLDOWN_MS;
       return sessionResponse(session, sessions, true);
     } catch (error) {
@@ -131,6 +133,13 @@ async function processPage(dependencies: UploadDependencies, session: RetrySessi
       if (result.type === "diagram") {
         result = { ...result, extracted_data: await dependencies.diagramProcessor.process(document,
           pageNumber - 1, result.bounding_box, dependencies.config.maxGeminiValidationAttempts) };
+        if (result.extracted_data?.kind === "diagram" && result.extracted_data.status === "processed" && dependencies.geometryProcessor) {
+          const generated = dependencies.geometryProcessor.process(result.extracted_data.data);
+          result = { ...result, geometry: generated.status === "validated" ? generated.geometry : null,
+            extracted_data: { ...result.extracted_data,
+              warnings: [...result.extracted_data.warnings, ...(generated.status === "validated" ? generated.warnings : [])],
+              geometry_processing: generated.status === "validated" ? { status: "validated" } : { status: "failed", error: generated.error } } };
+        }
       }
       prepared.processed.push(result);
     }
@@ -140,7 +149,9 @@ async function processPage(dependencies: UploadDependencies, session: RetrySessi
       page_number: pageNumber, status: "classified", raster: prepared.raster, has_text_layer: prepared.hasTextLayer,
       text_processing: failed("text") ? "partial_failure" : "complete",
       table_processing: failed("table") ? "partial_failure" : "complete",
-      diagram_processing: failed("diagram") ? "partial_failure" : "complete", regions,
+      diagram_processing: failed("diagram") ? "partial_failure" : "complete",
+      ...(dependencies.geometryProcessor ? { geometry_processing: prepared.processed.some((r) => r.extracted_data?.kind === "diagram" &&
+        (r.extracted_data.status === "failed" || r.extracted_data.geometry_processing?.status === "failed")) ? "partial_failure" as const : "complete" as const } : {}), regions,
     };
     session.prepared.delete(pageNumber);
   } catch (error) {
@@ -151,13 +162,23 @@ async function processPage(dependencies: UploadDependencies, session: RetrySessi
 function jobFailed(session: RetrySession): boolean {
   const classified = session.pages.filter((page): page is ClassifiedPage => page.status === "classified");
   const regions = classified.flatMap((page) => page.regions);
-  return !classified.length || (regions.length > 0 && regions.every((region) => region.extracted_data?.status === "failed"));
+  return !classified.length || (regions.length > 0 && regions.every((region) => region.extracted_data?.status === "failed" ||
+    (region.extracted_data?.kind === "diagram" && region.extracted_data.geometry_processing?.status === "failed")));
 }
 
-async function syncJobStatus(repository: JobRepository, session: RetrySession): Promise<void> {
+async function syncJobStatus(repository: JobRepository, session: RetrySession, geometryEnabled: boolean): Promise<void> {
   if (jobFailed(session)) {
     session.failedInDatabase = true;
+    session.reviewReady = false;
     await repository.markJobFailed(session.jobId!, "No pages or regions could be processed successfully.");
+  } else if (geometryEnabled && repository.markJobReady && session.pages.length === session.pageCount &&
+    session.pages.some((page) => page.status === "classified" && page.regions.length > 0) &&
+    session.pages.every((page) => page.status === "classified" && page.regions.every((region) =>
+      region.extracted_data?.status === "processed" && (region.type !== "diagram" ||
+        (region.extracted_data.kind === "diagram" && region.extracted_data.geometry_processing?.status === "validated" && !!region.geometry))))) {
+    await repository.markJobReady(session.jobId!);
+    session.failedInDatabase = false;
+    session.reviewReady = true;
   } else if (session.failedInDatabase) {
     if (!repository.markJobProcessing) throw new UploadError(503, "DATABASE_ERROR", "The recovered results were saved, but the job status could not be updated.");
     await repository.markJobProcessing(session.jobId!);
@@ -168,9 +189,9 @@ async function syncJobStatus(repository: JobRepository, session: RetrySession): 
 function sessionResponse(session: RetrySession, sessions: RetrySessionStore, retry: boolean): Response {
   const failed = jobFailed(session);
   const partial = session.pages.some((page) => page.status === "failed" ||
-    [page.text_processing, page.table_processing, page.diagram_processing].includes("partial_failure"));
+    [page.text_processing, page.table_processing, page.diagram_processing, page.geometry_processing].includes("partial_failure"));
   const retryable = session.pages.filter((page) => page.status === "failed" && page.retryable).map((page) => page.page_number);
-  return Response.json({ job_id: session.jobId, status: failed ? "failed" : "processing",
+  return Response.json({ job_id: session.jobId, status: failed ? "failed" : session.reviewReady ? "ready_for_review" : "processing",
     page_count: session.pageCount, pages: session.pages,
     retry: { url: `/api/jobs/${session.jobId}/retry`, eligible_pages: retryable,
       expires_at: new Date(session.expiresAt).toISOString(), remaining_requests: MAX_MANUAL_RETRIES - session.retries,

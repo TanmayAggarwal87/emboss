@@ -20,7 +20,8 @@ export class DiagramRegionProcessor implements DiagramProcessor {
       if (data.chart_type === "unsupported") {
         return failure("DIAGRAM_UNSUPPORTED", "This region is not a supported bar chart or single-series line graph. Other diagram types and image tables are not supported in v1.");
       }
-      const missing = data.data_points.some((point) => point.value === null);
+      const missing = data.data_points.some((point) => point.value === null)
+        || data.independent_axis.values.some((value) => value === null);
       return {
         kind: "diagram", status: "processed", source: "gemini", data,
         needs_data_review: missing,
