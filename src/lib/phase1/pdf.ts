@@ -124,7 +124,7 @@ class MuPdfDocumentHandle implements PdfDocumentHandle {
     validateRasterBox(box);
     const page = this.document.loadPage(pageIndex);
     try {
-      // Rerender the source crop at twice classification resolution for OCR.
+      // Rerender the source crop at twice classification resolution for OCR/Call B.
       // The output is bounded to 2000x2000 pixels regardless of PDF page size.
       const [scale, , , , offsetX, offsetY] = classificationTransform(page);
       const transform: mupdf.Matrix = [scale * 2, 0, 0, scale * 2,

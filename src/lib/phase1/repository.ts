@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 
 import { getSupabaseAdmin } from "../supabase/admin.ts";
 import { UploadError } from "./errors.ts";
@@ -36,19 +37,15 @@ export class SupabaseJobRepository implements JobRepository {
       return [];
     }
 
-    const { data, error } = await getSupabaseAdmin()
+    const records = regions.map((region) => ({
+      id: regionRowId(jobId, pageNumber, region.region_id),
+      job_id: jobId, page_number: pageNumber, type: region.type,
+      bounding_box: region.bounding_box, review_status: "pending" as const,
+      extracted_data: region.extracted_data ?? null,
+    }));
+    const { error } = await getSupabaseAdmin()
       .from("regions")
-      .insert(
-        regions.map((region) => ({
-          job_id: jobId,
-          page_number: pageNumber,
-          type: region.type,
-          bounding_box: region.bounding_box,
-          review_status: "pending" as const,
-          extracted_data: region.extracted_data ?? null,
-        })),
-      )
-      .select("id, type, bounding_box, review_status, extracted_data");
+      .upsert(records, { onConflict: "id", ignoreDuplicates: true });
 
     if (error) {
       throw new UploadError(
@@ -58,7 +55,16 @@ export class SupabaseJobRepository implements JobRepository {
       );
     }
 
-    return data as PersistedRegion[];
+    // A lost commit acknowledgement must not duplicate a page or overwrite a
+    // previously saved review result. Read back both new and existing IDs.
+    const { data, error: readError } = await getSupabaseAdmin().from("regions")
+      .select("id, type, bounding_box, review_status, extracted_data")
+      .eq("job_id", jobId).in("id", records.map((record) => record.id));
+    if (readError || data?.length !== records.length) {
+      throw new UploadError(503, "DATABASE_ERROR", `Page ${pageNumber} could not be confirmed as saved. Retry this page to resume without repeating its analysis.`);
+    }
+    const byId = new Map(data.map((row) => [row.id, row]));
+    return records.map((record) => byId.get(record.id)) as PersistedRegion[];
   }
 
   async markJobFailed(jobId: string, message: string): Promise<void> {
@@ -68,7 +74,19 @@ export class SupabaseJobRepository implements JobRepository {
       .eq("id", jobId);
 
     if (error) {
-      console.error("Failed to mark an unsuccessful Phase 1 job as failed.");
+      throw new UploadError(503, "DATABASE_ERROR", "The job status could not be saved. Its completed regions have been preserved.");
     }
   }
+
+  async markJobProcessing(jobId: string): Promise<void> {
+    const { error } = await getSupabaseAdmin().from("jobs")
+      .update({ status: "processing", error_message: null }).eq("id", jobId);
+    if (error) throw new UploadError(503, "DATABASE_ERROR", "The recovered job status could not be saved. Its completed regions have been preserved.");
+  }
+}
+
+export function regionRowId(jobId: string, pageNumber: number, regionId: string): string {
+  const hash = createHash("sha256").update(JSON.stringify([jobId, pageNumber, regionId])).digest("hex");
+  // UUIDv8 for a deterministic DB row key, not an element/geometry ID scheme.
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-8${hash.slice(13, 16)}-${((parseInt(hash[16], 16) & 3) | 8).toString(16)}${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
 }

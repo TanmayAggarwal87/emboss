@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { UploadRateLimiter } from "../../src/lib/phase1/rate-limit.ts";
 import { createUploadHandler } from "../../src/lib/phase1/upload-handler.ts";
+import { EXPECTED_CHARTS } from "../phase4/fixtures.ts";
 import type {
   ClassifiedRegion,
   JobRepository,
@@ -194,6 +195,8 @@ function createHarness(
       classifier,
       repository,
       tableProcessor: { process() { throw new Error("This fixture has no tables."); } },
+      diagramProcessor: { async process() { return { kind: "diagram", status: "processed", source: "gemini",
+        data: EXPECTED_CHARTS[0], needs_data_review: false, warnings: [] }; } },
       textProcessor: {
         async process() {
           return { kind: "text", status: "processed", source: "text_layer", plain_text: "fixture text",

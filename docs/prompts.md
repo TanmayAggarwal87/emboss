@@ -84,6 +84,14 @@ Nothing else. See `docs/pipeline.md` Stage 2, `AGENTS.md` §4.
 
 **Input:** one page raster image + its pixel width/height (injected at call time).
 
+Call A transport: 60-second individual request timeout, SDK HTTP retries disabled
+(`retryOptions.attempts: 1`). Application code permits two extra requests only for
+HTTP 429/503, waiting 30 then 90 seconds. This provider-retry budget is shared across
+all validation attempts for a page, so the maximum request count is the configured
+validation limit plus two, not the product of two retry loops. Request cancellation
+and the upload deadline interrupt both waiting and generation. The system prompt,
+temperature, configured model, and strict classification schema are unchanged.
+
 **API config:**
 - `responseMimeType: "application/json"`, `responseSchema` set to the shape below
 - `temperature: 0`
@@ -169,6 +177,12 @@ rendering coordinates. See `docs/pipeline.md` Stage 3c, `AGENTS.md` §4.
 - `temperature: 0`
 - Model: the pinned project model string (see project config)
 
+Call B transport config: `thinkingBudget: 0`, a 60-second request timeout, and
+SDK HTTP `retryOptions.attempts: 1`. Only malformed/invalid JSON is retried by
+application code; provider errors (including 429/503) are surfaced without an
+automatic HTTP retry loop. Log token counts per attempt without logging images or
+raw responses. The response schema uses separate supported/unsupported branches.
+
 **System prompt:**
 
 ```
@@ -248,6 +262,11 @@ Example (illustrative only — do not reuse these exact values):
   a validation failure and retry — this response must not reach geometry generation.
 - A `null` value in `data_points` is expected, honest output, not a validation
   failure — route it to human review rather than treating it as an error.
+- Require at least one data point for a bar chart and two for a line graph, with
+  non-empty point labels and finite numeric values or null. Reject unknown keys at
+  every object level, including extra data on an `unsupported` response. Preserve
+  source labels and point order. Source units in labels (e.g. `Rainfall (mm)` above)
+  describe chart data; they are not generated tactile dimensions.
 
 ---
 

@@ -98,7 +98,7 @@ Goal: Stage 3b from `docs/pipeline.md`.
 Verification: `docs/phase3-verification.md`. Checked against ruled/aligned fixtures
 and explicit malformed examples. Unstyled multi-row headers remain a documented
 first-row-assumption limitation requiring human review; this is not a claim of
-universal table detection. Image routing leaves Phase 4 work pending. Physical
+universal table detection. Image routing now connects to Phase 4 below. Physical
 conformance is not established by braille cell-layout checks.
 
 **Phase 3 is done when:** a simple rectangular table from your test PDF produces
@@ -111,20 +111,46 @@ correctly formatted braille table output, and an intentionally-malformed test ta
 
 Goal: Stage 3c Steps 1-2 from `docs/pipeline.md` — data only, no geometry yet.
 
-- [ ] Diagram type classification: bar chart / single-series line graph / unsupported
+- [x] Diagram type classification: bar chart / single-series line graph / unsupported
       (see exclusion list in `docs/bana-standards.md` §9)
-- [ ] Unsupported types fail with a clear message here — do not proceed to geometry
-- [ ] Gemini Call Type B: structured data extraction (chart type, data points, axis
+- [x] Unsupported types fail with a clear message here — do not proceed to geometry
+- [x] Gemini Call Type B: structured data extraction (chart type, data points, axis
       labels, series label) — verify output contains NO mm values, NO coordinates,
       NO geometry, per `AGENTS.md` §4
-- [ ] Validate extraction response with Zod; on failure retry up to
+- [x] Validate extraction response with Zod; on failure retry up to
       `MAX_GEMINI_VALIDATION_RETRIES` (3) times before failing that region only (not
       the whole job) with a clear message
-- [ ] Store result in `regions.extracted_data` for diagram regions
+- [x] Store result in `regions.extracted_data` for diagram regions
+
+Verified 2026-09-17: 13 Phase 4 tests and all 40 earlier-phase tests passed;
+lint, strict TypeScript and production build passed. Real Call B extracted exact
+labels/values from both generated bar and line charts, visually checked against
+their crops. The line check needed one later manual attempt after a service error;
+3 live requests total, no automatic service retries. Supabase read-back matched
+the line result with pending review and null geometry; synthetic rows were removed.
+Commands live in `docs/testing-scope.md`, evidence in `docs/compliance-report.md`.
 
 **Phase 4 is done when:** a bar chart and a line graph from your test PDF each
 produce correct structured data (right values, right labels) — verify by eye against
 the source diagram.
+
+---
+
+## Classification reliability follow-up (2026-09-17)
+
+- [x] Retry only Call A HTTP 429/503 with bounded 30/90-second backoff, disabling
+      SDK retries and preserving the separate Zod validation budget.
+- [x] Keep pages sequential and preserve successful pages; add failed-page-only
+      retry with temporary PDF sessions, cooldown, caps and concurrent-request guard.
+- [x] Reuse prepared page results and make region persistence idempotent, with clear
+      per-page errors and recovery of an all-failed job to `processing`.
+- [x] Verify 429/503 recovery/exhaustion, non-transient errors, success preservation,
+      sequential processing and failed-page retry with quota-free regression tests.
+
+18 recovery tests and all 53 Phase 1-4 tests passed, plus lint, strict TypeScript
+and the production build (both upload and retry routes).
+No live model traffic was used; deployment/session limitations are documented in
+`README.md` and `docs/testing-scope.md`. Phase 5 remains untouched.
 
 ---
 

@@ -56,6 +56,37 @@ PDF upload
   `.env.example` `MAX_GEMINI_VALIDATION_RETRIES`). After 3 failed attempts, fail that
   page's classification with a clear message rather than proceeding with invalid data.
 
+### Classification recovery (Stage 2 follow-up)
+
+Call A has a separate transport budget: only HTTP 429/503 retry, at 30 then 90
+seconds, with at most two extra requests **shared across** all Zod attempts for
+that page. SDK retries are disabled and each HTTP attempt times out at 60 seconds.
+Other service errors fail immediately; schema failures still use the configured
+validation-attempt limit. With three validation attempts, there are at most five
+HTTP requests per page per processing run, not three nested sets of three.
+
+Pages remain sequential and completed page results are preserved. Upload responses
+include failed-page `error_code`/`retryable` and `retry` metadata. Send
+`POST /api/jobs/<job_id>/retry` with `{"pages":[2]}` after `available_after` to resume
+only selected failed pages. A classified page is never reprocessed by this endpoint,
+even if one of its downstream region results failed. Call B behavior is unchanged.
+
+PDF bytes, validated classifications and completed region checkpoints live in a
+bounded process-local session; rasters are not retained. The session expires after
+15 minutes; completed/non-retryable jobs release bytes early. At most 20 sessions
+and 64 MiB of raw PDF bytes are retained per process (metadata is additional).
+Capacity exhaustion rejects new uploads before creating a job or calling Gemini.
+Concurrent retries of a job return 409; retries have a one-minute cooldown and a
+three-request per-job cap, sharing the five-request IP guard with uploads.
+
+Both endpoints declare a 600-second host allowance. A 180-second cooperative
+deadline cancels Call A/backoff and prevents starting further pages/regions; an
+already-running downstream region may finish before cleanup. There is no queue.
+Deploy on one long-lived Node process or guarantee same-process routing. Session
+loss/restart/expiry returns 410 without deleting persisted successes. Platform
+request limits must support this synchronous flow; session memory is not shared
+between independently deployed serverless functions.
+
 ## Stage 3a — Text regions
 
 - Input: a text region's bounding box + the source page's real text layer
@@ -125,7 +156,8 @@ Phase 3 implementation details:
   40 cells or a vertical row group over 25 lines fails instead of being truncated.
   These are braille text layout limits, not geometry or final export pagination.
 - Tables and failures persist using `docs/data-model.md`. Image tables are saved as
-  pending diagram regions; Phase 4 processing is not implemented by this handoff.
+  diagram regions and now pass through Phase 4; actual image tables fail the narrow
+  chart-type check. This handoff does not enable table-data extraction by Gemini.
   This stage invokes neither Gemini nor OCR and does not implement review/export.
 
 ## Stage 3c — Diagram regions (Gemini Call Type B)
@@ -153,6 +185,25 @@ Phase 3 implementation details:
   preview. A design with violations does not proceed to Stage 4.
 - Output: a three.js mesh/scene graph representing the tactile diagram, with
   addressable elements (see `docs/data-model.md` for ID scheme once finalized).
+
+Phase 4 implements **Steps 1-2 only**:
+
+- MuPDF rerenders just the classified box at twice classification resolution,
+  bounded to 2000x2000 pixels, using the shared transform. Call B sees that single
+  crop, never the full page. Image-table rerouting uses this same path.
+- `docs/prompts.md` supplies the exact Call B system prompt; `GEMINI_MODEL` selects
+  the model. Native structured output and strict nested Zod validation enforce the
+  documented shape. Bar/line classification and content extraction occur in one
+  Call B, separate from page classification (Call A).
+- Only JSON/schema validation failures retry, up to the configured total attempts.
+  Unsupported and nullable results do not retry. Call B disables SDK HTTP retries
+  and uses a 60-second request timeout; 429/503/timeout, blocked/incomplete responses,
+  and validation exhaustion produce clear per-region failures. Token counts and
+  numeric service status are logged without raw document content or credentials.
+- Valid data and explicit errors persist using `docs/data-model.md`. Null values
+  stay null and require data review before future geometry generation. Jobs remain
+  `processing`, regions remain `pending`, and geometry stays null. Steps 3-4 and
+  the review/export stages remain later work.
 
 ## Stage 4 — Preview
 

@@ -1,5 +1,9 @@
 # Phase 2 verification
 
+Phase 4 compatibility note: the current diagnostic classifies only the two text
+fixture regions; historical references below to two untouched diagram rows describe
+the original Phase 2 run. Text/OCR checks and the zero-Gemini guarantee are unchanged.
+
 All commands below make **zero Gemini calls**. Run them from the repository root
 with npm and Node 24 (the existing TypeScript test runner uses Node's experimental
 type transformation). The `react-server` condition enables the standard

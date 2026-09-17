@@ -43,8 +43,9 @@ Phase 3's verified subset is complete ruled grids (including empty data cells) a
 consistently aligned unruled tables without missing cells. Ambiguous, partial-grid,
 clipped, or rotated layouts fail locally. Header identification remains provisional
 for unstyled multi-row headers; the first-row assumption is explicitly recorded for
-human review. Image tables route to pending diagrams, not table OCR or AI text
-transcription. See `docs/phase3-verification.md` for fixtures and repeatable checks.
+human review. Image tables route to diagram processing and are unsupported unless
+they actually contain a supported chart; there is no table OCR or AI table-text
+transcription. See `docs/phase3-verification.md` for the original Phase 3 evidence.
 
 ## Processing scope
 
@@ -52,17 +53,41 @@ transcription. See `docs/phase3-verification.md` for fixtures and repeatable che
   lifecycle for this test scope. If processing genuinely proves too slow for a
   2-3 page document once real testing starts, that's a signal to revisit — not a
   reason to pre-build queueing infrastructure now.
-- **No retry/backoff infrastructure beyond basic error handling.** If a Gemini call
-  fails, surface the failure clearly (per-region, so one failed diagram doesn't sink
-  the whole job) rather than building a sophisticated retry system for v1.
+- **Bounded Call A recovery only.** At user request, classification retries HTTP
+  429/503 after 30 then 90 seconds, with two extra requests shared across validation
+  attempts. Disable SDK retries. Other errors do not automatically retry. Keep
+  pages sequential and expose failures without losing successful pages. This is
+  not a queue, generalized retry framework, or automatic Call B retry feature.
 - **Zod validation retry**: a Gemini response that fails validation is retried up to
-  **3 total attempts** before that region is marked failed. This is the one defined
-  retry behavior in v1 — don't add retry logic anywhere else without a reason.
+  **3 total attempts** before that page/region is marked failed. This validation
+  budget remains separate from Call A's two extra transport requests.
 - **Upload size cap: 7 MB.** Enforced before any processing starts. Reject over-cap
   uploads with a clear message, don't attempt partial processing.
-- **Abuse guard: 5 upload requests per IP.** A basic floor, not a full rate-limiting
+- **Abuse guard: 5 upload/retry requests per IP.** A basic floor, not a full rate-limiting
   system — appropriate given there's no auth standing between the public upload
   route and Gemini spend. Don't over-build this for v1.
+
+## Classification recovery verification
+
+Run `npm run test:retry` alongside all four phase test scripts, `npm run lint`,
+`npx tsc --noEmit`, and `npm run build`. Tests inject errors and instant sleepers:
+they verify the 30/90-second schedule without real waiting or Gemini traffic.
+Coverage includes 429/503 recovery/exhaustion, non-transient errors, cancellation,
+separate Zod budgets, sequential pages, success preservation, subset retry/replay,
+cooldown/caps, concurrent retry exclusion, expiry/capacity, database checkpoint
+reuse, and insert-on-conflict idempotence after a simulated lost acknowledgement.
+Repository fault injection exercises the Supabase client against a fake transport,
+not the hosted database; it is not a new live database or model accuracy test.
+
+For manual use, keep the upload response's `job_id` and `retry` metadata, wait until
+`available_after`, then send `{"pages":[2]}` to its retry URL. Never run a repeated
+upload loop. Sessions last 15 minutes on the same Node process, with three manual
+retry requests and a one-minute cooldown; both endpoints share the existing IP
+guard. Its counts reset on process restart, not after a timed window. The deployment
+proxy must supply trustworthy client-IP headers. Multi-instance storage/rate limits
+are outside this v1 floor; independent serverless instances cannot resume the PDF.
+See `README.md` for host-duration requirements. Persistent failures can still occur:
+this verifies recovery mechanics, not provider uptime or perception consistency.
 
 ## Cost/token scope
 
@@ -73,6 +98,28 @@ transcription. See `docs/phase3-verification.md` for fixtures and repeatable che
   MuPDF/liblouis/deterministic-only (see `docs/pipeline.md`, "Cost/token discipline"
   section) — this is the most likely place scope quietly expands token cost without
   anyone deciding it should.
+
+## Phase 4 verification
+
+```bash
+npm run test:phase4
+npm run verify:phase4 -- --artifacts
+npm run verify:phase4 -- --database
+npm run verify:phase4 -- --live --database --artifacts
+```
+
+Tests and default diagnostics use fixed responses and make zero model requests.
+`--live` makes at most two Call B requests against generated bar/line chart crops,
+with one attempt each and no Call A; it stops on the first error or mismatch.
+To resume only one chart after waiting through a provider failure, add
+`--chart line` or `--chart bar`. Do not repeatedly upload whole PDFs to retest one
+failed chart. `--database` reads back the resulting synthetic diagram rows and
+deletes only its own test job/regions. `--artifacts` prints a temporary directory
+containing the source PDF, chart crops and result JSON for visual comparison.
+
+The fixture checks chart types, labels, exact values, and strict response shape;
+it is a limited perception sample, not proof of accuracy on arbitrary diagrams.
+Physical constraints and rendered output are outside Phase 4 verification.
 
 ## Review/edit scope
 

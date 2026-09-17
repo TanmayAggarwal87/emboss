@@ -15,6 +15,7 @@ import { getBrailleGrade } from "../src/lib/phase2/config.ts";
 import { LocalTextRecognizer } from "../src/lib/phase2/ocr.ts";
 import { TextRegionProcessor } from "../src/lib/phase2/text-processor.ts";
 import { TableRegionProcessor } from "../src/lib/phase3/table-processor.ts";
+import { DiagramRegionProcessor } from "../src/lib/phase4/diagram-processor.ts";
 import { getSupabaseAdmin } from "../src/lib/supabase/admin.ts";
 import { createTableFixture, TABLE_BOX, TABLE_HEADERS, TABLE_ROWS } from "../tests/phase3/fixtures.ts";
 
@@ -61,6 +62,8 @@ try {
     classifier: { async classify() { return [{ region_id: "table", type: "table", bounding_box: TABLE_BOX }]; } },
     textProcessor: new TextRegionProcessor(grade, new LocalTextRecognizer()),
     tableProcessor: new TableRegionProcessor(grade),
+    // Keep this diagnostic quota-free: real diagram processing, fixed unsupported perception.
+    diagramProcessor: new DiagramRegionProcessor({ async extract() { return { chart_type: "unsupported" }; } }),
   });
   const form = new FormData();
   form.set("file", new File([Uint8Array.from(bytes)], "phase3-fixture.pdf", { type: "application/pdf" }));
@@ -82,7 +85,8 @@ try {
   assert.ok(lines.filter(Boolean).every((line) => line.slice(good.column_widths_cells[0], good.column_widths_cells[0] + 3) === "   "));
   const bad = rows[1].extracted_data;
   assert.ok(bad?.status === "failed" && bad.error.code === "TABLE_MERGED_CELLS");
-  assert.equal(rows[2].extracted_data, null);
+  const imageTable = rows[2].extracted_data;
+  assert.ok(imageTable?.kind === "diagram" && imageTable.status === "failed" && imageTable.error.code === "DIAGRAM_UNSUPPORTED");
   if (database) {
     const { data, error } = await getSupabaseAdmin().from("regions")
       .select("id, type, bounding_box, review_status, extracted_data, geometry, page_number").eq("job_id", createdJob!).order("page_number");

@@ -1,5 +1,10 @@
 # Phase 3 verification
 
+Phase 4 compatibility note: the current diagnostic injects an `unsupported` chart
+response for the image-table handoff, so that diagram now stores an explicit error
+instead of null. It still makes zero Gemini calls. The recorded results below are
+the original Phase 3 run, before Call B was implemented.
+
 Verified on 2026-09-17. Phase 3 implements deterministic real-text table extraction,
 UEB braille formatting, per-region errors, and image-table routing only. No Phase 4
 model calls, geometry, review UI, or export were added.

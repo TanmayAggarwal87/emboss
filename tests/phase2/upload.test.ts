@@ -6,13 +6,14 @@ import { UploadRateLimiter } from "../../src/lib/phase1/rate-limit.ts";
 import { createUploadHandler } from "../../src/lib/phase1/upload-handler.ts";
 import type { ClassifiedRegion, PersistedRegion } from "../../src/lib/phase1/types.ts";
 import { TextRegionProcessor } from "../../src/lib/phase2/text-processor.ts";
+import { EXPECTED_CHARTS } from "../phase4/fixtures.ts";
 import { createTextFixture, TEXT_BOX, REFERENCE_GRADE_2, REFERENCE_TEXT } from "./fixtures.ts";
 
 const VALID_REGION: ClassifiedRegion = { region_id: "text", type: "text", bounding_box: TEXT_BOX };
 const EMPTY_REGION: ClassifiedRegion = { region_id: "empty", type: "text", bounding_box: { x: 0, y: 0, width: 50, height: 50 } };
 const DIAGRAM_REGION: ClassifiedRegion = { region_id: "diagram", type: "diagram", bounding_box: { x: 180, y: 680, width: 200, height: 210 } };
 
-test("upload passes real text and braille to persistence and leaves diagram processing untouched", async () => {
+test("upload passes real text and braille to persistence with diagram processing injected", async () => {
   const harness = createHarness([VALID_REGION, DIAGRAM_REGION]);
   const response = await harness.run();
   assert.equal(response.status, 201);
@@ -28,7 +29,7 @@ test("upload passes real text and braille to persistence and leaves diagram proc
       assert.equal(row.extracted_data.plain_text, REFERENCE_TEXT);
       assert.equal(row.extracted_data.braille, REFERENCE_GRADE_2);
     } else {
-      assert.equal(row.extracted_data, null);
+      assert.equal(row.extracted_data?.kind, "diagram");
     }
   }
   assert.equal(harness.destroyed(), true);
@@ -87,6 +88,8 @@ function createHarness(classified: ClassifiedRegion[], failFirstSave = false) {
     classifier: { async classify() { classificationCalls += 1; return classified; } },
     textProcessor: new TextRegionProcessor(2, { async recognize() { assert.fail("Text fixture must never use OCR."); } }),
     tableProcessor: { process() { assert.fail("Phase 2 fixtures contain no tables."); } },
+    diagramProcessor: { async process() { return { kind: "diagram", status: "processed", source: "gemini",
+      data: EXPECTED_CHARTS[0], needs_data_review: false, warnings: [] }; } },
     repository: {
       async createJob() { return "test-job"; },
       async insertRegions(_jobId, pageNumber, regions) {

@@ -18,7 +18,7 @@ export class ClassificationValidationError extends Error {
 }
 
 export class ClassificationServiceError extends Error {
-  constructor(message: string, options?: ErrorOptions) {
+  constructor(message: string, options?: ErrorOptions, readonly httpStatus?: number) {
     super(message, options);
     this.name = "ClassificationServiceError";
   }

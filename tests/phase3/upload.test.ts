@@ -7,6 +7,7 @@ import { createUploadHandler } from "../../src/lib/phase1/upload-handler.ts";
 import type { PersistedRegion } from "../../src/lib/phase1/types.ts";
 import { TextRegionProcessor } from "../../src/lib/phase2/text-processor.ts";
 import { TableRegionProcessor } from "../../src/lib/phase3/table-processor.ts";
+import { DiagramRegionProcessor } from "../../src/lib/phase4/diagram-processor.ts";
 import { createTableFixture, TABLE_BOX, TABLE_HEADERS, TABLE_ROWS, type FixtureMode } from "./fixtures.ts";
 
 test("upload persists table data, a per-region failure and diagram rerouting without model calls", async (context) => {
@@ -28,7 +29,9 @@ test("upload persists table data, a per-region failure and diagram rerouting wit
   const failed = harness.rows[1].extracted_data;
   assert.ok(failed?.status === "failed");
   assert.equal(failed.error.code, "TABLE_MERGED_CELLS");
-  assert.equal(harness.rows[2].extracted_data, null);
+  const diagram = harness.rows[2].extracted_data;
+  assert.ok(diagram?.kind === "diagram" && diagram.status === "failed");
+  assert.equal(diagram.error.code, "DIAGRAM_UNSUPPORTED");
   assert.equal(body.pages[1].table_processing, "partial_failure");
   assert.equal(body.pages[1].text_processing, "complete");
   assert.equal(harness.destroyed(), true);
@@ -62,6 +65,7 @@ function createHarness(modes: FixtureMode[]) {
     } },
     textProcessor: new TextRegionProcessor(2, { async recognize() { assert.fail("Table handling must never use text OCR."); } }),
     tableProcessor: new TableRegionProcessor(2),
+    diagramProcessor: new DiagramRegionProcessor({ async extract() { return { chart_type: "unsupported" }; } }),
     repository: {
       async createJob() { return "fixture-job"; },
       async insertRegions(_job, page, regions) {

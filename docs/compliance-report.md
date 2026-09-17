@@ -1,6 +1,6 @@
 # Emboss — Compliance & Validation Report
 
-`[2026-09-17]: Phase 3 synthetic table extraction, braille cell-layout checks, and Supabase round trip passed; physical conformance and complete v1 end-to-end output remain unverified.`
+`[2026-09-17]: Phase 4 live bar/line data extraction and Supabase verification passed alongside 53 automated tests; physical conformance and complete v1 end-to-end output remain unverified.`
 
 ---
 
@@ -104,7 +104,51 @@ because a later run succeeded — both are evidence.
   null geometry, and deleted its synthetic job/regions. Zero Gemini calls were made.
 - Commands, artifacts and limitations: `docs/phase3-verification.md`.
 
+### Phase 4 evidence — 2026-09-17
+
+- 13/13 Phase 4 tests plus 40/40 earlier-phase tests passed. Lint, strict TypeScript,
+  production build, and the offline Phase 2/3/4 diagnostics passed. The built upload
+  route's file trace includes the canonical prompt Markdown.
+- Tests covered strict nested schemas, forbidden geometry/coordinate fields,
+  malformed JSON, finite values, exact validation attempt limits, null-value review
+  flags, unsupported types, crop failures, and no repeated HTTP calls on 429/503.
+  Same-page/later-page successes survived a failed diagram; all-failed regions
+  marked the job failed. Image tables used the diagram handoff; text tables made
+  no Call B request.
+- Live Call B on generated PDF crops: `Monthly totals` bar chart returned
+  Jan=10, Feb=20, Mar=30; `Monthly trend` single-series line graph returned
+  Jan=5, Feb=15, Mar=10. Both matched `Month`/`Count` axis labels and series labels.
+  Crops and result JSON were inspected together. These were fixed fixture boxes,
+  not a fresh live Call A classification accuracy test.
+- First live run: bar passed and was persisted; line returned a service error and
+  the diagnostic stopped. After working on build/docs for several minutes, a
+  line-only run passed. Exactly 3 Gemini requests in total; no automatic HTTP
+  retries. The two successful calls reported 2113 and 2116 total tokens; usage for
+  the failed request was unavailable, so this is not a full request-cost estimate.
+- Line-only Supabase read-back matched exactly one diagram row, its source page
+  and box, validated data, pending review, and null geometry. Both live runs removed
+  their synthetic jobs/regions. PDF and crop bytes were never persisted to Supabase.
+- Repeatable commands and quota limits are in `docs/testing-scope.md`. No new
+  verification Markdown file was created for this phase.
+
 ---
+
+### Classification recovery evidence (2026-09-17)
+
+- Reproduced the missing transient-503 recovery before the fix; the regression now
+  passes. 18 offline recovery tests and all 53 earlier phase tests passed, together
+  with lint, strict TypeScript and the production build. Both route traces include
+  the canonical prompts, OCR worker and liblouis tables.
+- Simulated 429/503, exhausted budgets, non-transient failures, cancellation,
+  sequential/subset retry, preservation of successful results, session expiry,
+  cooldown/concurrency/caps, and a lost database acknowledgement. Supabase SDK
+  requests used an injected transport for the idempotence check, not a live DB.
+- Zero live Gemini calls were made for this follow-up. These tests establish retry
+  mechanics only, not improved provider uptime or identical classifications.
+- Sessions require the same running Node process within 15 minutes; restarts or
+  separate serverless workers return 410. Saved database results are not deleted.
+  Page-level retry does not repair an individual failed downstream region on a
+  classified page. Physical conformance remains unverified.
 
 ## C. Known limitations / provisional results
 
@@ -115,8 +159,12 @@ because a later run succeeded — both are evidence.
   successful table retains a first-row header assumption warning and pending review.
 - Sparse unruled tables and ambiguous structures fail rather than being guessed.
   Complex PDF clipping/overpainting and decorative table layouts are not verified.
-- Image overlap conservatively routes a table to a pending diagram. This does not
-  implement diagram extraction or promise that Phase 4 supports arbitrary table images.
+- Image overlap conservatively routes a table through diagram extraction. Genuine
+  table images are unsupported by Call B's bar/line schema; table OCR is not provided.
+- Phase 4's live evidence is one simple labeled bar chart and one simple labeled
+  line graph. Schema validation cannot prove that a model read a value correctly;
+  source comparison and human approval remain necessary. Null values are retained
+  and flagged for data review before geometry can be generated.
 - Guide dots and braille layout have not been tested with an embosser, physical
   print, specialist transcriber, or blind reader. Cell-space checks are not mm checks.
 - Geometry, review, edits, exports, and the full v1 acceptance run remain pending.

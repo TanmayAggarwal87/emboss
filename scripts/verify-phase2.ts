@@ -62,10 +62,10 @@ async function verifyFixture(scanned: boolean) {
       rateLimiter: new UploadRateLimiter(), openPdf, repository,
       classifier: { async classify() { return [
         { region_id: "text", type: "text", bounding_box: TEXT_BOX },
-        { region_id: "diagram", type: "diagram", bounding_box: { x: 180, y: 680, width: 200, height: 210 } },
       ]; } },
       textProcessor: new TextRegionProcessor(grade, new LocalTextRecognizer()),
       tableProcessor: new TableRegionProcessor(grade),
+      diagramProcessor: { async process() { throw new Error("The Phase 2 diagnostic classifies text only."); } },
     });
     const form = new FormData();
     form.set("file", new File([Uint8Array.from(createTextFixture({ scanned }))], "phase2-fixture.pdf", { type: "application/pdf" }));
@@ -74,10 +74,10 @@ async function verifyFixture(scanned: boolean) {
     const body = await response.json();
     assert.equal(response.status, 201, JSON.stringify(body));
     assert.equal(body.status, "processing");
-    assert.equal(rows.length, 4);
+    assert.equal(rows.length, 2);
     for (const row of rows) {
       assert.equal(row.review_status, "pending");
-      if (row.type !== "text") { assert.equal(row.extracted_data, null); continue; }
+      assert.equal(row.type, "text");
       assert.equal(row.extracted_data?.status, "processed");
       if (row.extracted_data?.status !== "processed" || row.extracted_data.kind !== "text") assert.fail("Text result missing.");
       assert.equal(row.extracted_data.plain_text, REFERENCE_TEXT);
@@ -88,7 +88,7 @@ async function verifyFixture(scanned: boolean) {
       const { data, error } = await getSupabaseAdmin().from("regions")
         .select("id, type, bounding_box, review_status, extracted_data, geometry").eq("job_id", createdJobId!);
       assert.equal(error, null);
-      assert.equal(data?.length, 4);
+      assert.equal(data?.length, 2);
       for (const row of data ?? []) {
         assert.equal(row.geometry, null);
         const persisted = { id: row.id, type: row.type, bounding_box: row.bounding_box,
@@ -100,7 +100,7 @@ async function verifyFixture(scanned: boolean) {
       assert.equal(jobError, null);
       assert.deepEqual(job, { status: "processing", page_count: 2 });
     }
-    console.log(`PASS ${scanned ? "scanned" : "text-layer"} PDF: 2 text regions match UEB Grade ${grade} reference; 2 diagrams untouched; all pending${databaseRepository ? "; database read-back matches" : " (offline)"}.`);
+    console.log(`PASS ${scanned ? "scanned" : "text-layer"} PDF: 2 text regions match UEB Grade ${grade} reference; all pending${databaseRepository ? "; database read-back matches" : " (offline)"}.`);
   } finally {
     if (databaseRepository && createdJobId) {
       // Delete only the synthetic job created by this run; FK cascade removes its

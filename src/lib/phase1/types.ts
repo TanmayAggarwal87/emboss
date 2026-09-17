@@ -1,5 +1,6 @@
 import type { TextRegionResult } from "../phase2/types.ts";
 import type { TableEvidence, TableRegionResult } from "../phase3/types.ts";
+import type { DiagramRegionResult } from "../phase4/types.ts";
 
 export type RegionType = "text" | "diagram" | "table";
 
@@ -29,10 +30,10 @@ export type PersistedRegion = {
   type: RegionType;
   bounding_box: BoundingBox;
   review_status: "pending";
-  extracted_data?: TextRegionResult | TableRegionResult | null;
+  extracted_data?: TextRegionResult | TableRegionResult | DiagramRegionResult | null;
 };
 
-export type RegionToPersist = ClassifiedRegion & { extracted_data?: TextRegionResult | TableRegionResult | null };
+export type RegionToPersist = ClassifiedRegion & { extracted_data?: TextRegionResult | TableRegionResult | DiagramRegionResult | null };
 
 export type Phase1Config = {
   maxPdfPages: number;
@@ -54,6 +55,7 @@ export interface RegionClassifier {
   classify(
     page: RasterizedPage,
     maxValidationAttempts: number,
+    signal?: AbortSignal,
   ): Promise<ClassifiedRegion[]>;
 }
 
@@ -65,4 +67,5 @@ export interface JobRepository {
     regions: RegionToPersist[],
   ): Promise<PersistedRegion[]>;
   markJobFailed(jobId: string, message: string): Promise<void>;
+  markJobProcessing?(jobId: string): Promise<void>;
 }

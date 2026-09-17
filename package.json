@@ -10,6 +10,9 @@
     "test:phase1": "node --experimental-transform-types --test tests/phase1/classification.test.ts tests/phase1/pdf.test.ts tests/phase1/prompt.test.ts tests/phase1/upload-handler.test.ts",
     "test:phase2": "node --conditions=react-server --experimental-transform-types --test tests/phase2/*.test.ts",
     "test:phase3": "node --conditions=react-server --experimental-transform-types --test tests/phase3/*.test.ts",
+    "test:phase4": "node --conditions=react-server --experimental-transform-types --test tests/phase4/*.test.ts",
+    "test:retry": "node --conditions=react-server --experimental-transform-types --test tests/retry/*.test.ts",
+    "verify:phase4": "node --conditions=react-server --experimental-transform-types scripts/verify-phase4.ts",
     "verify:phase3": "node --conditions=react-server --experimental-transform-types scripts/verify-phase3.ts",
     "verify:phase2": "node --conditions=react-server --experimental-transform-types scripts/verify-phase2.ts"
   },

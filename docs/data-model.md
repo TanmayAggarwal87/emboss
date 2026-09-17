@@ -92,7 +92,7 @@ just don't reach for a persistent storage bucket to solve it, per AGENTS.md §5.
 A failed region instead stores `{ kind: "text", status: "failed", error: { code,
 message } }`. Processing failure is not human rejection: `review_status` remains
 `pending` in both cases. Do not treat a pending failed region as usable output.
-Diagram regions still have `extracted_data: null` until Phase 4.
+Diagram regions now use the Phase 4 contract below.
 No schema migration is required for these JSON values.
 
 Phase 2 runs within the upload request before MuPDF is closed. The response includes
@@ -128,12 +128,13 @@ remain `processing`; review readiness is deferred to the later pipeline phases.
 
 Failure stores `{ kind: "table", status: "failed", error: { code, message } }`.
 `review_status` stays `pending` for successes and failures; `geometry` stays null.
-No migration or Storage bucket is needed. The original PDF remains available only
-during synchronous processing, not in these JSON values.
+No migration or Storage bucket is needed. The original PDF remains available in
+the temporary retry session described below, not in these JSON values.
 
 MuPDF image evidence inside a table box changes that region's persisted `type` to
-`diagram`, preserving its box/page and leaving `extracted_data: null`. This is a
-handoff to Phase 4, not completed image-table extraction. No Call Type B runs yet.
+`diagram`, preserving its box/page. The upload pipeline then runs Phase 4 Call B
+on that region. A genuine image table will be rejected as an unsupported diagram;
+rerouting does not enable table OCR or table-data extraction by Gemini.
 Unreliable real-text tables fail locally rather than being sent to an AI fallback.
 
 The upload response adds `table_processing: "complete" | "partial_failure"` on
@@ -141,6 +142,67 @@ classified pages, independently of `text_processing`. `complete` means no table
 processor failed; it does not mean a rerouted diagram has finished processing.
 HTTP 207 preserves other regions when one fails. HTTP 422 marks the job failed if
 all pages fail or every persisted region failed; otherwise it remains `processing`.
+
+### Diagram region result (Phase 4)
+
+`src/lib/phase4/types.ts` adds a result to the existing JSONB column; no migration
+or Storage bucket is needed:
+
+```ts
+{
+  kind: "diagram",
+  status: "processed", // chart data extracted; geometry has NOT been generated
+  source: "gemini",
+  data: {
+    chart_type: "bar_chart" | "line_graph_single_series",
+    axis_labels: { x: string | null, y: string | null },
+    data_points: { label: string, value: number | null }[],
+    series_label: string | null
+  },
+  needs_data_review: boolean,
+  warnings: string[]
+}
+```
+
+The `data` object is strict Zod-validated Call B output. Extra keys at every level,
+non-finite values, empty point labels, and missing fields are rejected. Bar charts
+need at least one point, line graphs at least two. Source labels and point ordering
+are preserved; chart units in labels are not tactile dimensions.
+
+Unreadable values remain null, set `needs_data_review: true`, and carry a warning.
+Future geometry generation must not consume those gaps as zero or interpolate
+them silently. All results still require human approval, including complete data.
+
+Unsupported diagrams and processing failures instead store
+`{ kind: "diagram", status: "failed", error: { code, message } }`. Raw invalid AI
+responses are never persisted. Failure is local to the region and does not mean
+human rejection: `review_status` stays `pending`. `geometry` remains null.
+
+Classified pages now include `diagram_processing: "complete" | "partial_failure"`.
+Null values needing review are valid extraction output, not failed processing.
+HTTP 207/422 behavior remains as above. Jobs remain `processing` until later stages
+can supply validated geometry and review readiness; Phase 4 does not set
+`ready_for_review`. Crops remain request-local; PDF bytes may outlive a request in
+the temporary retry session, but neither is saved to Supabase.
+
+### Temporary page retry state
+
+Failed page status, error codes, retry eligibility, validated classification and
+completed region checkpoints are process-local, not new database tables. Source
+PDF bytes are retained for a 15-minute retry session (active work is allowed to
+finish before eviction); no rasters are retained. Completion or permanent page
+failures release PDF bytes early. Session count and byte caps are documented in
+`docs/pipeline.md`. Restart/expiry/another server instance means HTTP 410, not loss
+of saved database results. There is no durable page-status/history API in v1.
+
+Region row IDs are deterministic UUIDv8 hashes of job ID, page number and validated
+Call A region ID. Insert-on-conflict-do-nothing followed by read-back makes retries
+safe after a lost write acknowledgement without duplicating rows or overwriting
+saved review/data. This is a database row key, **not** the future geometry element
+ID scheme. Existing region rows need no migration. Successful pages are skipped;
+prepared failed pages reuse their analysis rather than paying for Gemini again.
+An all-failed job can return to `processing` after page recovery; it is not promoted
+to `ready_for_review` by retrying.
 
 ### `edits` (optional — only if you want an edit history, not required for v1 function)
 | Column | Type | Notes |

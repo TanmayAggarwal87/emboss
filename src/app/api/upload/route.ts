@@ -1,31 +1,14 @@
-import { getPhase1Config } from "@/lib/phase1/config";
 import { UploadError } from "@/lib/phase1/errors";
-import { GeminiRegionClassifier } from "@/lib/phase1/gemini";
-import { openPdf } from "@/lib/phase1/pdf";
-import { UploadRateLimiter } from "@/lib/phase1/rate-limit";
-import { SupabaseJobRepository } from "@/lib/phase1/repository";
 import { createUploadHandler } from "@/lib/phase1/upload-handler";
-import { getBrailleGrade } from "@/lib/phase2/config";
-import { LocalTextRecognizer } from "@/lib/phase2/ocr";
-import { TextRegionProcessor } from "@/lib/phase2/text-processor";
-import { TableRegionProcessor } from "@/lib/phase3/table-processor";
+import { getUploadDependencies } from "@/lib/phase1/runtime";
 
 export const runtime = "nodejs";
 
-const rateLimiter = new UploadRateLimiter();
+export const maxDuration = 600;
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    const phase1Config = getPhase1Config();
-    const handler = createUploadHandler({
-      config: phase1Config,
-      rateLimiter,
-      openPdf,
-      classifier: new GeminiRegionClassifier(),
-      repository: new SupabaseJobRepository(),
-      textProcessor: new TextRegionProcessor(getBrailleGrade(), new LocalTextRecognizer()),
-      tableProcessor: new TableRegionProcessor(getBrailleGrade()),
-    });
+    const handler = createUploadHandler(getUploadDependencies());
 
     return handler(request);
   } catch (error) {
