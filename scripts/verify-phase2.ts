@@ -11,6 +11,7 @@ import { createUploadHandler } from "../src/lib/phase1/upload-handler.ts";
 import { getBrailleGrade } from "../src/lib/phase2/config.ts";
 import { LocalTextRecognizer } from "../src/lib/phase2/ocr.ts";
 import { TextRegionProcessor } from "../src/lib/phase2/text-processor.ts";
+import { TableRegionProcessor } from "../src/lib/phase3/table-processor.ts";
 import { getSupabaseAdmin } from "../src/lib/supabase/admin.ts";
 import { createTextFixture, TEXT_BOX, REFERENCE_TEXT, REFERENCE_GRADE_1, REFERENCE_GRADE_2 } from "../tests/phase2/fixtures.ts";
 
@@ -64,6 +65,7 @@ async function verifyFixture(scanned: boolean) {
         { region_id: "diagram", type: "diagram", bounding_box: { x: 180, y: 680, width: 200, height: 210 } },
       ]; } },
       textProcessor: new TextRegionProcessor(grade, new LocalTextRecognizer()),
+      tableProcessor: new TableRegionProcessor(grade),
     });
     const form = new FormData();
     form.set("file", new File([Uint8Array.from(createTextFixture({ scanned }))], "phase2-fixture.pdf", { type: "application/pdf" }));
@@ -77,7 +79,7 @@ async function verifyFixture(scanned: boolean) {
       assert.equal(row.review_status, "pending");
       if (row.type !== "text") { assert.equal(row.extracted_data, null); continue; }
       assert.equal(row.extracted_data?.status, "processed");
-      if (row.extracted_data?.status !== "processed") assert.fail("Text result missing.");
+      if (row.extracted_data?.status !== "processed" || row.extracted_data.kind !== "text") assert.fail("Text result missing.");
       assert.equal(row.extracted_data.plain_text, REFERENCE_TEXT);
       assert.equal(row.extracted_data.braille, expectedBraille);
       assert.equal(row.extracted_data.source, scanned ? "ocr" : "text_layer");

@@ -92,14 +92,55 @@ just don't reach for a persistent storage bucket to solve it, per AGENTS.md §5.
 A failed region instead stores `{ kind: "text", status: "failed", error: { code,
 message } }`. Processing failure is not human rejection: `review_status` remains
 `pending` in both cases. Do not treat a pending failed region as usable output.
-Tables and diagrams still have `extracted_data: null` until their own phases.
+Diagram regions still have `extracted_data: null` until Phase 4.
 No schema migration is required for these JSON values.
 
 Phase 2 runs within the upload request before MuPDF is closed. The response includes
 these results per region and `text_processing: "complete" | "partial_failure"` on
-classified pages. Partial failures return HTTP 207; if the document has only failed
-text regions, its job is marked `failed` and HTTP 422 is returned. Successful jobs
+classified pages. Partial failures return HTTP 207; if all persisted regions have
+failed processing, the job is marked `failed` and HTTP 422 is returned. Successful jobs
 remain `processing`; review readiness is deferred to the later pipeline phases.
+
+### Table region result (Phase 3)
+
+`src/lib/phase3/types.ts` defines the table variant stored in the same JSONB column:
+
+```ts
+{
+  kind: "table",
+  status: "processed",
+  source: "text_layer",
+  headers: string[],
+  rows: string[][],
+  braille_headers: string[],
+  braille_rows: string[][],
+  braille_pages: string[], // each section <=40 cells wide and <=25 lines
+  layout: "aligned" | "vertical_list",
+  column_widths_cells: number[], // aligned-layout widths, not physical dimensions
+  column_alignment: ("left" | "right")[],
+  braille_grade: 1 | 2,
+  braille_code: "UEB",
+  translation_table: string,
+  liblouis_version: string,
+  warnings: string[]
+}
+```
+
+Failure stores `{ kind: "table", status: "failed", error: { code, message } }`.
+`review_status` stays `pending` for successes and failures; `geometry` stays null.
+No migration or Storage bucket is needed. The original PDF remains available only
+during synchronous processing, not in these JSON values.
+
+MuPDF image evidence inside a table box changes that region's persisted `type` to
+`diagram`, preserving its box/page and leaving `extracted_data: null`. This is a
+handoff to Phase 4, not completed image-table extraction. No Call Type B runs yet.
+Unreliable real-text tables fail locally rather than being sent to an AI fallback.
+
+The upload response adds `table_processing: "complete" | "partial_failure"` on
+classified pages, independently of `text_processing`. `complete` means no table
+processor failed; it does not mean a rerouted diagram has finished processing.
+HTTP 207 preserves other regions when one fails. HTTP 422 marks the job failed if
+all pages fail or every persisted region failed; otherwise it remains `processing`.
 
 ### `edits` (optional — only if you want an edit history, not required for v1 function)
 | Column | Type | Notes |

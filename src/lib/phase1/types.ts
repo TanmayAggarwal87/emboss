@@ -1,4 +1,5 @@
 import type { TextRegionResult } from "../phase2/types.ts";
+import type { TableEvidence, TableRegionResult } from "../phase3/types.ts";
 
 export type RegionType = "text" | "diagram" | "table";
 
@@ -28,10 +29,10 @@ export type PersistedRegion = {
   type: RegionType;
   bounding_box: BoundingBox;
   review_status: "pending";
-  extracted_data?: TextRegionResult | null;
+  extracted_data?: TextRegionResult | TableRegionResult | null;
 };
 
-export type RegionToPersist = ClassifiedRegion & { extracted_data?: TextRegionResult };
+export type RegionToPersist = ClassifiedRegion & { extracted_data?: TextRegionResult | TableRegionResult | null };
 
 export type Phase1Config = {
   maxPdfPages: number;
@@ -45,6 +46,7 @@ export interface PdfDocumentHandle {
   rasterizePage(pageIndex: number): RasterizedPage;
   extractTextRegion(pageIndex: number, box: BoundingBox): string;
   rasterizeRegion(pageIndex: number, box: BoundingBox): Uint8Array;
+  inspectTableRegion(pageIndex: number, box: BoundingBox): TableEvidence;
   destroy(): void;
 }
 

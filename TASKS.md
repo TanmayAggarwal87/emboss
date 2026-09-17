@@ -85,15 +85,21 @@ possible.
 
 Goal: Stage 3b from `docs/pipeline.md`.
 
-- [ ] Detect real text table vs. embedded image table; route image tables to Phase 4
+- [x] Detect real text table vs. embedded image table; route image tables to Phase 4
       (diagram pipeline) instead
-- [ ] MuPDF extraction of rows/columns for real text tables
-- [ ] Apply BANA table rules from `docs/bana-standards.md` §8: alignment, 3-cell
+- [x] MuPDF extraction of rows/columns for real text tables
+- [x] Apply BANA table rules from `docs/bana-standards.md` §8: alignment, 3-cell
       spacing, guide-dot railing instead of grid lines, hyphen-fill for empty cells
-- [ ] Detect and reject unsupported table shapes (merged cells, multi-row headers,
+- [x] Detect and reject unsupported table shapes (merged cells, multi-row headers,
       stem-and-leaf, perimeter-less Punnett-style) per the exclusion list in
       `docs/bana-standards.md` §8
-- [ ] Store result in `regions.extracted_data` for table regions
+- [x] Store result in `regions.extracted_data` for table regions
+
+Verification: `docs/phase3-verification.md`. Checked against ruled/aligned fixtures
+and explicit malformed examples. Unstyled multi-row headers remain a documented
+first-row-assumption limitation requiring human review; this is not a claim of
+universal table detection. Image routing leaves Phase 4 work pending. Physical
+conformance is not established by braille cell-layout checks.
 
 **Phase 3 is done when:** a simple rectangular table from your test PDF produces
 correctly formatted braille table output, and an intentionally-malformed test table

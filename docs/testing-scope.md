@@ -39,6 +39,13 @@ not a placeholder to "fix later" unless explicitly noted.
 - Detecting a table that doesn't fit this shape should result in an explicit
   rejection/flag for that region, not a best-effort attempt.
 
+Phase 3's verified subset is complete ruled grids (including empty data cells) and
+consistently aligned unruled tables without missing cells. Ambiguous, partial-grid,
+clipped, or rotated layouts fail locally. Header identification remains provisional
+for unstyled multi-row headers; the first-row assumption is explicitly recorded for
+human review. Image tables route to pending diagrams, not table OCR or AI text
+transcription. See `docs/phase3-verification.md` for fixtures and repeatable checks.
+
 ## Processing scope
 
 - **No background job queue.** Processing happens synchronously within the request

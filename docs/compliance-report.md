@@ -1,10 +1,6 @@
 # Emboss — Compliance & Validation Report
 
-**Status line — update every time this file changes:**
-`[YYYY-MM-DD]: <one honest sentence on where evidence actually stands>`
-
-Current status (template — replace before first real entry):
-`[unset]: No test runs yet. This file has no data until Phase 5/9 testing begins.`
+`[2026-09-17]: Phase 3 synthetic table extraction, braille cell-layout checks, and Supabase round trip passed; physical conformance and complete v1 end-to-end output remain unverified.`
 
 ---
 
@@ -55,8 +51,26 @@ accepted it.
 | Table border heights (if used) | _unset_ | §8 border table | _unset_ | _unset_ |
 | Page/plate margin | _unset_ | §1, 6.35 mm | _unset_ | _unset_ |
 
-Add rows as new geometry types are implemented. Remove this note once the table has
-real entries.
+No geometry validator has run yet. Physical rows above intentionally remain unset.
+
+### Phase 3 braille text-layout evidence (not physical measurements)
+
+Tests below ran on 2026-09-17 in `tests/phase3/format.test.ts`; source constants
+are in `docs/bana-standards.md` §§1/8. They do not establish millimeter dimensions,
+embosser behavior, or expert transcription approval.
+
+| Check | Observed result | Evidence scope |
+|---|---|---|
+| Column separation | 3 blank braille cells | Aligned fixture rows/header |
+| Header separation | 1 blank line | Each aligned output section |
+| Alignment | Text left, numbers right | Name/Count fixture |
+| Guide dots | Dot 5 with 1 intervening blank | Spare text-column padding; column gap stays blank |
+| Empty cells | Centered two-hyphen indicator | Empty Count cell |
+| Text page limits | At most 40 cells/line, 25 lines/section | Aligned, vertical-list, and multi-section fixtures |
+| Oversized content | Explicit failure | Unbreakable value exceeds 40 cells |
+
+Fixed Grade 1 examples matched expected Unicode braille. This limited reference
+check is not a full UEB transcription audit.
 
 ---
 
@@ -64,7 +78,8 @@ real entries.
 
 Track actual end-to-end runs here — not capability claims, actual attempts.
 
-**Test documents run:** _0 so far_
+**Complete upload-to-reviewed-export test documents run:** 0. The later stages
+are not implemented; scoped phase diagnostics below do not count as end-to-end runs.
 
 | Document | Date | Pages | Regions detected (text/diagram/table) | Outcome | Notes |
 |---|---|---|---|---|---|
@@ -74,21 +89,37 @@ Track actual end-to-end runs here — not capability claims, actual attempts.
 succeeded)`, `failed — <named reason>`. Never leave a failure undocumented just
 because a later run succeeded — both are evidence.
 
+### Scoped phase evidence
+
+- Phase 2 evidence is recorded in `docs/phase2-verification.md`.
+- Phase 3, 2026-09-17: 12/12 table tests and all 28 Phase 1/2 regression tests passed.
+  Strict TypeScript, lint, and the production build passed.
+- One generated three-page fixture used fixed classification boxes (not Gemini):
+  a valid text table produced matching cells/braille; a merged table failed locally;
+  an image table on a mixed page became a pending diagram. HTTP 207 was expected.
+  Source raster/cell output was visually inspected. No physical sample was produced.
+- Offline diagnostic passed. Initial sandboxed database attempt failed before job
+  creation with a database/network error. Authorized network-enabled verification
+  then read back exactly three matching `table/table/diagram` rows, all pending with
+  null geometry, and deleted its synthetic job/regions. Zero Gemini calls were made.
+- Commands, artifacts and limitations: `docs/phase3-verification.md`.
+
 ---
 
 ## C. Known limitations / provisional results
 
-Use this section the way you'd warn a teammate, not the way you'd write marketing
-copy. Examples of the kind of honesty this section needs (replace with real ones as
-they come up):
-
-- _e.g. "Bar chart geometry tested on only 2 sample charts so far — both had 4-6
-  bars. Untested at higher bar counts near the plate-size failure boundary."_
-- _e.g. "Line graph point-symbol placement passes validation but hasn't been
-  reviewed by an actual sighted tester comparing mesh to source — validator passing
-  is not the same as confirmed legible."_
-- _e.g. "Table guide-dot rendering implemented per spec but not yet cross-checked
-  against a real embosser or physical print."_
+- Synthetic table fixtures are a small sample. No new live classification accuracy
+  test was run for Phase 3; fixed boxes deliberately avoided Gemini quota use.
+- Clear merged/incomplete grids and styled multi-header cases are rejected, but
+  unstyled multi-row headers cannot be reliably distinguished from data. Every
+  successful table retains a first-row header assumption warning and pending review.
+- Sparse unruled tables and ambiguous structures fail rather than being guessed.
+  Complex PDF clipping/overpainting and decorative table layouts are not verified.
+- Image overlap conservatively routes a table to a pending diagram. This does not
+  implement diagram extraction or promise that Phase 4 supports arbitrary table images.
+- Guide dots and braille layout have not been tested with an embosser, physical
+  print, specialist transcriber, or blind reader. Cell-space checks are not mm checks.
+- Geometry, review, edits, exports, and the full v1 acceptance run remain pending.
 
 ---
 

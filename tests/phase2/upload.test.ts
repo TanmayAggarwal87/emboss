@@ -12,19 +12,19 @@ const VALID_REGION: ClassifiedRegion = { region_id: "text", type: "text", boundi
 const EMPTY_REGION: ClassifiedRegion = { region_id: "empty", type: "text", bounding_box: { x: 0, y: 0, width: 50, height: 50 } };
 const DIAGRAM_REGION: ClassifiedRegion = { region_id: "diagram", type: "diagram", bounding_box: { x: 180, y: 680, width: 200, height: 210 } };
 
-test("upload passes real text and braille to persistence and leaves diagram/table processing untouched", async () => {
-  const harness = createHarness([VALID_REGION, DIAGRAM_REGION, { ...DIAGRAM_REGION, region_id: "table", type: "table" }]);
+test("upload passes real text and braille to persistence and leaves diagram processing untouched", async () => {
+  const harness = createHarness([VALID_REGION, DIAGRAM_REGION]);
   const response = await harness.run();
   assert.equal(response.status, 201);
   const body = await response.json();
   assert.equal(body.status, "processing");
   assert.equal(harness.classifications(), 2, "Only the two upstream classification calls are needed.");
-  assert.equal(harness.rows.length, 6);
+  assert.equal(harness.rows.length, 4);
   for (const row of harness.rows) {
     assert.equal(row.review_status, "pending");
     if (row.type === "text") {
       assert.equal(row.extracted_data?.status, "processed");
-      if (row.extracted_data?.status !== "processed") assert.fail("Missing text result.");
+      if (row.extracted_data?.status !== "processed" || row.extracted_data.kind !== "text") assert.fail("Missing text result.");
       assert.equal(row.extracted_data.plain_text, REFERENCE_TEXT);
       assert.equal(row.extracted_data.braille, REFERENCE_GRADE_2);
     } else {
@@ -80,11 +80,13 @@ function createHarness(classified: ClassifiedRegion[], failFirstSave = false) {
         rasterizePage: document.rasterizePage.bind(document),
         extractTextRegion: document.extractTextRegion.bind(document),
         rasterizeRegion: document.rasterizeRegion.bind(document),
+        inspectTableRegion: document.inspectTableRegion.bind(document),
         destroy() { document.destroy(); destroyed = true; },
       };
     },
     classifier: { async classify() { classificationCalls += 1; return classified; } },
     textProcessor: new TextRegionProcessor(2, { async recognize() { assert.fail("Text fixture must never use OCR."); } }),
+    tableProcessor: { process() { assert.fail("Phase 2 fixtures contain no tables."); } },
     repository: {
       async createJob() { return "test-job"; },
       async insertRegions(_jobId, pageNumber, regions) {

@@ -5,6 +5,7 @@ import {
 } from "./errors.ts";
 import { getClientIp, UploadRateLimiter } from "./rate-limit.ts";
 import type { TextProcessor } from "../phase2/types.ts";
+import type { TableProcessor } from "../phase3/types.ts";
 import type {
   JobRepository,
   PdfDocumentHandle,
@@ -24,6 +25,7 @@ type UploadDependencies = {
   classifier: RegionClassifier;
   repository: JobRepository;
   textProcessor: TextProcessor;
+  tableProcessor: TableProcessor;
 };
 
 export function createUploadHandler(dependencies: UploadDependencies) {
@@ -69,10 +71,14 @@ export function createUploadHandler(dependencies: UploadDependencies) {
             );
             const processed: RegionToPersist[] = [];
             for (const region of classifications) {
-              processed.push(region.type === "text" ? {
-                ...region,
-                extracted_data: await dependencies.textProcessor.process(document, page, region.bounding_box),
-              } : region);
+              if (region.type === "text") {
+                processed.push({ ...region,
+                  extracted_data: await dependencies.textProcessor.process(document, page, region.bounding_box) });
+              } else if (region.type === "table") {
+                processed.push({ ...region, ...dependencies.tableProcessor.process(document, pageIndex, region.bounding_box) });
+              } else {
+                processed.push(region);
+              }
             }
             const regions = await dependencies.repository.insertRegions(
               jobId,
@@ -85,7 +91,9 @@ export function createUploadHandler(dependencies: UploadDependencies) {
               status: "classified" as const,
               raster: { width: page.width, height: page.height },
               has_text_layer: page.hasTextLayer,
-              text_processing: processed.some((region) => region.extracted_data?.status === "failed")
+              text_processing: processed.some((region) => region.type === "text" && region.extracted_data?.status === "failed")
+                ? "partial_failure" as const : "complete" as const,
+              table_processing: processed.some((region) => region.type === "table" && region.extracted_data?.status === "failed")
                 ? "partial_failure" as const : "complete" as const,
               regions,
             });
@@ -100,17 +108,17 @@ export function createUploadHandler(dependencies: UploadDependencies) {
 
         const failedPages = pages.filter((page) => page.status === "failed");
         const allPagesFailed = failedPages.length === document.pageCount;
-        const hasTextFailures = pages.some((page) =>
-          page.status === "classified" && page.text_processing === "partial_failure");
+        const hasRegionFailures = pages.some((page) => page.status === "classified" &&
+          (page.text_processing === "partial_failure" || page.table_processing === "partial_failure"));
         const allRegions = pages.flatMap((page) => page.status === "classified" ? page.regions : []);
-        const allTextFailed = !allPagesFailed && allRegions.length > 0 &&
-          allRegions.every((region) => region.type === "text" && region.extracted_data?.status === "failed");
-        const jobFailed = allPagesFailed || allTextFailed;
+        const allRegionsFailed = !allPagesFailed && allRegions.length > 0 &&
+          allRegions.every((region) => region.extracted_data?.status === "failed");
+        const jobFailed = allPagesFailed || allRegionsFailed;
 
         if (jobFailed) {
           await dependencies.repository.markJobFailed(
             jobId,
-            allPagesFailed ? "No pages could be classified reliably." : "No text regions could be processed successfully.",
+            allPagesFailed ? "No pages could be classified reliably." : "No regions could be processed successfully.",
           );
         }
 
@@ -122,7 +130,7 @@ export function createUploadHandler(dependencies: UploadDependencies) {
             pages,
           },
           {
-            status: jobFailed ? 422 : failedPages.length > 0 || hasTextFailures ? 207 : 201,
+            status: jobFailed ? 422 : failedPages.length > 0 || hasRegionFailures ? 207 : 201,
           },
         );
       } finally {

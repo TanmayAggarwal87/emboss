@@ -91,9 +91,10 @@ Phase 2 implementation details:
 
 ## Stage 3b — Table regions
 
-- First, determine: is this a real text-based table (extractable via MuPDF) or an
-  embedded image of a table? If the region's content isn't extractable as structured
-  text via MuPDF, treat it as a diagram region instead and route to 3c.
+- First, inspect the region using MuPDF: real text table or embedded image table?
+  Image content inside the box routes it to 3c, even on a page that also has real
+  text. An ambiguous real-text structure fails locally; extraction failure alone
+  is not permission to send table text to an AI fallback.
 - If it's a real text table: extract rows/columns via MuPDF, apply BANA table rules
   from `docs/bana-standards.md` §8 (alignment, 3-cell spacing, guide dots instead of
   grid lines, hyphen-fill for empty cells).
@@ -102,6 +103,30 @@ Phase 2 implementation details:
   See `docs/bana-standards.md` §8 for the exact exclusion list.
 - Output: braille-formatted table text, following BANA structural rules, no LLM
   involvement for a genuine text table.
+
+Phase 3 implementation details:
+
+- Character bounds, font evidence, images, and vector rules use the same raster
+  transform as classification. Both stroked rules and thin filled rectangles are
+  recognized. Complete rectangular grids support empty cells; unruled tables must
+  have consistent columns with clear shared gutters and no missing cells.
+- Incomplete grids, merged-cell evidence, clipped/rotated text, multi-line headers,
+  additional all-bold header-like rows, and recognized stem-and-leaf/Punnett shapes
+  fail per region. Arbitrary unstyled multi-row headers cannot be identified with
+  certainty: every result warns that the first row is assumed to be the header and
+  requires human verification. Sparse/ambiguous unruled tables are rejected.
+- liblouis translates cells with the existing UEB grade setting. Constants in
+  `src/lib/phase3/table-rules.ts` reference `docs/bana-standards.md` §§1/8: 3 blank
+  cells between columns, 1 blank line after headers, dot-5 guides with 1 intervening
+  blank in spare text-column padding, and centered two-hyphen empty-cell indicators.
+  Numeric columns align right; text columns align left. PDF grid lines are not output.
+- Output sections fit 40 cells by 25 lines. Aligned sections repeat their header;
+  wide tables use a vertical list with repeated labels. An unbreakable value over
+  40 cells or a vertical row group over 25 lines fails instead of being truncated.
+  These are braille text layout limits, not geometry or final export pagination.
+- Tables and failures persist using `docs/data-model.md`. Image tables are saved as
+  pending diagram regions; Phase 4 processing is not implemented by this handoff.
+  This stage invokes neither Gemini nor OCR and does not implement review/export.
 
 ## Stage 3c — Diagram regions (Gemini Call Type B)
 

@@ -8,6 +8,7 @@ import { createUploadHandler } from "@/lib/phase1/upload-handler";
 import { getBrailleGrade } from "@/lib/phase2/config";
 import { LocalTextRecognizer } from "@/lib/phase2/ocr";
 import { TextRegionProcessor } from "@/lib/phase2/text-processor";
+import { TableRegionProcessor } from "@/lib/phase3/table-processor";
 
 export const runtime = "nodejs";
 
@@ -23,6 +24,7 @@ export async function POST(request: Request): Promise<Response> {
       classifier: new GeminiRegionClassifier(),
       repository: new SupabaseJobRepository(),
       textProcessor: new TextRegionProcessor(getBrailleGrade(), new LocalTextRecognizer()),
+      tableProcessor: new TableRegionProcessor(getBrailleGrade()),
     });
 
     return handler(request);

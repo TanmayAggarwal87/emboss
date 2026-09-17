@@ -136,6 +136,7 @@ function createHarness(
     pageCount,
     extractTextRegion() { return "fixture text"; },
     rasterizeRegion() { return new Uint8Array(); },
+    inspectTableRegion() { throw new Error("This fixture has no tables."); },
     rasterizePage(pageIndex: number): RasterizedPage {
       return {
         pageNumber: pageIndex + 1,
@@ -192,6 +193,7 @@ function createHarness(
       },
       classifier,
       repository,
+      tableProcessor: { process() { throw new Error("This fixture has no tables."); } },
       textProcessor: {
         async process() {
           return { kind: "text", status: "processed", source: "text_layer", plain_text: "fixture text",

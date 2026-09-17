@@ -1,6 +1,7 @@
 import * as mupdf from "mupdf";
 
 import { UploadError } from "./errors.ts";
+import { inspectTablePage } from "../phase3/pdf-evidence.ts";
 import { CLASSIFICATION_RASTER_SIZE, classificationTransform, validateRasterBox } from "./pdf-coordinates.ts";
 import type {
   BoundingBox,
@@ -74,6 +75,15 @@ class MuPdfDocumentHandle implements PdfDocumentHandle {
 
   destroy(): void {
     this.document.destroy();
+  }
+
+  inspectTableRegion(pageIndex: number, box: BoundingBox) {
+    const page = this.document.loadPage(pageIndex);
+    try {
+      return inspectTablePage(page, box);
+    } finally {
+      page.destroy();
+    }
   }
 
   extractTextRegion(pageIndex: number, box: BoundingBox): string {
