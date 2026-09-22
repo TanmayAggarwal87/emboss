@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useRef } from "react"
-import { FileUp, FileText, AlertCircle } from "lucide-react"
+import { FileUp, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { cn } from "@/lib/utils"

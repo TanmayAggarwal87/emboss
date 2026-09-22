@@ -1,5 +1,4 @@
-import React from "react"
-import { Check, X, Circle, AlertTriangle, FileText, Table2, BarChart3, TrendingUp } from "lucide-react"
+import { Check, X, Circle } from "lucide-react"
 import type { PersistedRegionItem } from "@/lib/frontend-types"
 
 interface DocumentOutlineProps {
@@ -41,7 +40,7 @@ export function DocumentOutline({
     if (region.type === "text") return "Text block"
     if (region.type === "table") return "Table"
     if (region.type === "diagram") {
-      return region.extracted_data?.data?.chart_type === "line_graph_single_series"
+      return region.extracted_data?.kind === "diagram" && region.extracted_data.status === "processed" && region.extracted_data.data.chart_type === "line_graph_single_series"
         ? "Line graph"
         : "Bar chart"
     }

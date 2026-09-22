@@ -9,14 +9,12 @@ import {
   Table2,
   Box,
   RotateCcw,
-  Sparkles,
   Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 import JSZip from "jszip"
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js"
-import { buildGeometryMesh, disposeGeometryMesh } from "@/lib/phase5/mesh"
+import { buildGeometryMesh, disposeGeometryMesh } from "@/lib/tactile-geometry/mesh"
 import type { PersistedRegionItem } from "@/lib/frontend-types"
 
 interface ExportViewProps {
@@ -27,7 +25,6 @@ interface ExportViewProps {
 
 export function ExportView({ fileName, regions, onReset }: ExportViewProps) {
   const [isExporting, setIsExporting] = useState(false)
-  const [downloadSuccess, setDownloadSuccess] = useState(false)
 
   const approvedRegions = regions.filter((r) => r.review_status === "approved")
   const rejectedRegions = regions.filter((r) => r.review_status === "rejected")
@@ -53,8 +50,9 @@ export function ExportView({ fileName, regions, onReset }: ExportViewProps) {
       // 1. Text Regions Braille Files
       let combinedBrailleText = ""
       approvedRegions
-        .filter((r) => r.type === "text" && r.extracted_data?.braille)
+        .filter((r) => r.type === "text" && r.extracted_data?.kind === "text" && r.extracted_data.status === "processed")
         .forEach((r, i) => {
+          if (r.extracted_data?.kind !== "text" || r.extracted_data.status !== "processed") return
           const content = r.extracted_data.braille
           zip.file(`text_page_${r.page_number}_region_${i + 1}.brf`, content)
           combinedBrailleText += `--- Page ${r.page_number} ---\n\n${content}\n\n`
@@ -66,8 +64,9 @@ export function ExportView({ fileName, regions, onReset }: ExportViewProps) {
 
       // 2. Table Regions Braille Files
       approvedRegions
-        .filter((r) => r.type === "table" && r.extracted_data?.braille_pages)
+        .filter((r) => r.type === "table" && r.extracted_data?.kind === "table" && r.extracted_data.status === "processed")
         .forEach((r, i) => {
+          if (r.extracted_data?.kind !== "table" || r.extracted_data.status !== "processed") return
           const content = r.extracted_data.braille_pages.join("\n\n---\n\n")
           zip.file(`table_page_${r.page_number}_region_${i + 1}.brf`, content)
         })
@@ -79,7 +78,7 @@ export function ExportView({ fileName, regions, onReset }: ExportViewProps) {
           const meshGroup = buildGeometryMesh(r.geometry)
           try {
             const stlOutput = exporter.parse(meshGroup, { binary: true })
-            zip.file(`tactile_graphic_page_${r.page_number}_diagram_${i + 1}.stl`, stlOutput)
+            zip.file(`tactile_graphic_page_${r.page_number}_diagram_${i + 1}.stl`, stlOutput.buffer)
           } finally {
             disposeGeometryMesh(meshGroup)
           }
@@ -114,8 +113,6 @@ Tactile STL files can be directly sliced in standard FDM slicers (PrusaSlicer, B
       link.click()
       document.body.removeChild(link)
       URL.revokeObjectURL(url)
-
-      setDownloadSuccess(true)
     } catch (error) {
       console.error("Export generation failed", error)
     } finally {
@@ -213,7 +210,7 @@ Tactile STL files can be directly sliced in standard FDM slicers (PrusaSlicer, B
         <ShieldCheck className="size-5 shrink-0 text-neutral-800 mt-0.5" />
         <div className="space-y-0.5">
           <span className="font-semibold text-neutral-900 block">
-            Your document isn't stored permanently
+            Your document isn&apos;t stored permanently
           </span>
           <p className="text-[11px] leading-relaxed text-neutral-500">
             Emboss keeps this job only for the current workflow session. There is no account history, persistent document library, or external file storage bucket.

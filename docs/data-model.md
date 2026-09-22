@@ -71,7 +71,7 @@ just don't reach for a persistent storage bucket to solve it, per AGENTS.md §5.
 ### Text region result (Phase 2)
 
 `regions.extracted_data` stores a discriminated result, typed in
-`src/lib/phase2/types.ts`. Successful text results retain both the source and braille:
+`src/lib/text-processing/types.ts`. Successful text results retain both the source and braille:
 
 ```ts
 {
@@ -103,7 +103,7 @@ remain `processing`; review readiness is deferred to the later pipeline phases.
 
 ### Table region result (Phase 3)
 
-`src/lib/phase3/types.ts` defines the table variant stored in the same JSONB column:
+`src/lib/table-processing/types.ts` defines the table variant stored in the same JSONB column:
 
 ```ts
 {
@@ -145,7 +145,7 @@ all pages fail or every persisted region failed; otherwise it remains `processin
 
 ### Diagram region result (Phase 4)
 
-`src/lib/phase4/types.ts` adds a result to the existing JSONB column; no migration
+`src/lib/diagram-extraction/types.ts` adds a result to the existing JSONB column; no migration
 or Storage bucket is needed:
 
 ```ts
@@ -194,7 +194,7 @@ the temporary retry session, but neither is saved to Supabase.
 Failed page status, error codes, retry eligibility, validated classification and
 completed region checkpoints are process-local, not new database tables. Source
 PDF bytes are retained for a 15-minute retry session (active work is allowed to
-finish before eviction); no rasters are retained. Completion or permanent page
+finish before eviction); no full page rasters are retained. Completion or permanent page
 failures release PDF bytes early. Session count and byte caps are documented in
 `docs/pipeline.md`. Restart/expiry/another server instance means HTTP 410, not loss
 of saved database results. There is no durable page-status/history API in v1.
@@ -220,6 +220,35 @@ to `ready_for_review` by retrying.
 This table is a nice-to-have for demoing "here's what human review caught," not a
 functional requirement — skip it if it adds friction, add it back if you want that
 demo point.
+
+---
+
+### Source preview metadata (Phase 6)
+
+`source_preview` is **response-only metadata** attached to region objects in the
+upload and retry API JSON responses (`PersistedRegionItem.source_preview`):
+
+```ts
+export interface SourcePreview {
+  url?: string;        // e.g. "/api/jobs/<jobId>/regions/<regionId>/source"
+  expires_at?: string; // ISO 8601 timestamp (15 minutes from rasterization)
+  error?: string;      // Populated if raster crop creation failed
+}
+```
+
+- **Not persisted in Postgres**: The `regions` table does NOT contain a `source_preview`
+  column. Database rows store only `bounding_box`, `extracted_data`, `geometry`, and
+  `review_status`.
+- **Not stored in Supabase Storage**: No storage buckets are used in v1 (`AGENTS.md` §5).
+  The high-resolution PNG bytes are cached strictly in Node.js process memory using a
+  bounded LRU cache (50 MB limit, 15-minute TTL).
+- **Temporary URL & Expiry (HTTP 410)**: The URL `/api/jobs/[jobId]/regions/[regionId]/source`
+  serves the exact PNG bytes privately (`Cache-Control: private, no-store`). When the
+  in-memory TTL expires, or if the server process restarts or another serverless replica
+  receives the request, the endpoint returns **HTTP 410 Gone**.
+- **Non-blocking for geometry/review**: Expiry of a source preview does not alter or invalidate
+  the region's persisted geometry or review status in Postgres. The review UI cleanly displays
+  an expired notice while preserving 3D tactile inspection.
 
 ---
 

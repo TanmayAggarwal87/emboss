@@ -2,13 +2,8 @@
 
 import React, { useState } from "react"
 import {
-  Sparkles,
-  Layers,
-  BookOpen,
-  CheckCircle2,
   ExternalLink,
   ShieldCheck,
-  FileCode,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {

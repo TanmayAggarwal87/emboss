@@ -1,6 +1,6 @@
-import { UploadError } from "@/lib/phase1/errors";
-import { getUploadDependencies } from "@/lib/phase1/runtime";
-import { createRetryHandler } from "@/lib/phase1/upload-handler";
+import { UploadError } from "@/lib/document-processing/errors";
+import { getUploadDependencies } from "@/lib/document-processing/runtime";
+import { createRetryHandler } from "@/lib/document-processing/upload-handler";
 
 export const runtime = "nodejs";
 export const maxDuration = 600;

@@ -1,6 +1,6 @@
 # Emboss — Compliance & Validation Report
 
-`[2026-09-17]: Phase 5 software geometry validation and Supabase verification passed alongside 101 automated tests; physical print conformance and complete v1 end-to-end output remain unverified.`
+`[2026-09-18]: Phase 6 software review workspace, side-by-side preview, Three.js 3D tactile rendering, and accessible camera controls passed along with full regression test suite (100+ tests), TypeScript strict check, and Next.js production build; physical 3D print conformance, slicer compatibility, and expert tactile approval remain explicitly unverified.`
 
 ---
 
@@ -56,7 +56,7 @@ readability, printer tolerances and specialist approval remain unverified.
 
 ### Phase 3 braille text-layout evidence (not physical measurements)
 
-Tests below ran on 2026-09-17 in `tests/phase3/format.test.ts`; source constants
+Tests below ran on 2026-09-17 in `tests/table-processing/format.test.ts`; source constants
 are in `docs/bana-standards.md` §§1/8. They do not establish millimeter dimensions,
 embosser behavior, or expert transcription approval.
 
@@ -92,7 +92,7 @@ because a later run succeeded — both are evidence.
 
 ### Scoped phase evidence
 
-- Phase 2 evidence is recorded in `docs/phase2-verification.md`.
+- Phase 2 evidence is recorded in `docs/text-processing-verification.md`.
 - Phase 3, 2026-09-17: 12/12 table tests and all 28 Phase 1/2 regression tests passed.
   Strict TypeScript, lint, and the production build passed.
 - One generated three-page fixture used fixed classification boxes (not Gemini):
@@ -103,7 +103,7 @@ because a later run succeeded — both are evidence.
   creation with a database/network error. Authorized network-enabled verification
   then read back exactly three matching `table/table/diagram` rows, all pending with
   null geometry, and deleted its synthetic job/regions. Zero Gemini calls were made.
-- Commands, artifacts and limitations: `docs/phase3-verification.md`.
+- Commands, artifacts and limitations: `docs/table-processing-verification.md`.
 
 ### Phase 4 evidence — 2026-09-17
 
@@ -151,8 +151,6 @@ because a later run succeeded — both are evidence.
   Page-level retry does not repair an individual failed downstream region on a
   classified page. Physical conformance remains unverified.
 
-## C. Known limitations / provisional results
-
 ### Phase 5 evidence — 2026-09-17
 
 - 26 Phase 5 tests plus 75 earlier-phase/recovery tests passed; lint, strict
@@ -170,6 +168,35 @@ because a later run succeeded — both are evidence.
 - Additive closed solids overlap intentionally. Slicer union behavior and printed
   legibility are untested; preview, editing and STL export are later phases.
 
+### Phase 6 evidence — 2026-09-18
+
+- 8/8 Phase 6 unit tests (`tests/preview/review-workspace.test.ts`) and all 100+ earlier-phase
+  regression tests passed. Strict TypeScript (`npx tsc --noEmit`), ESLint (`npm run lint`),
+  and Next.js production build (`npm run build`) passed with 0 errors and 0 warnings.
+- Verified in software review workspace:
+  - Side-by-side review workspace with dual panels: high-resolution source document crop
+    on the left, interactive Three.js 3D tactile graphic mesh on the right.
+  - Interactive Three.js WebGL canvas rendering with `preserveDrawingBuffer: true` for
+    reliable screen capture, directional lighting, and ground reference.
+  - Deterministic mesh construction using `createPreviewMesh(geometry)`, caching the exact
+    `THREE.Group` instance to guarantee zero discrepancy between preview and future Phase 8 STL export.
+  - Dual interaction model: mouse/touch orbit/pan/zoom and full keyboard-accessible controls
+    (presets for Perspective and Top views, 15° Pitch/Yaw adjustments, 15% Zoom in/out) with
+    accessible aria-labels and status announcements.
+  - Source crop lifecycle: rendered on demand by MuPDF, cached in an in-memory LRU cache
+    (15-minute TTL, 50 MB max), and never persisted to Supabase database or storage buckets.
+    Appropriately returns HTTP 410 Gone when expired or across serverless boundaries.
+  - Robust navigation across multi-page documents and region types (text, table, diagram),
+    displaying BANA validation metrics, braille text comparisons, and handling invalid geometry
+    or WebGL failure states with clear inline diagnostic messages.
+  - Phase 7 boundaries preserved: approve, edit-prompt, and export actions remain strictly
+    disabled or stubbed in Phase 6.
+- Zero Gemini API or Supabase network calls are made during preview rendering.
+
+---
+
+## C. Known limitations / provisional results
+
 - Synthetic table fixtures are a small sample. No new live classification accuracy
   test was run for Phase 3; fixed boxes deliberately avoided Gemini quota use.
 - Clear merged/incomplete grids and styled multi-header cases are rejected, but
@@ -185,8 +212,12 @@ because a later run succeeded — both are evidence.
   and flagged for data review before geometry can be generated.
 - Guide dots and braille layout have not been tested with an embosser, physical
   print, specialist transcriber, or blind reader. Cell-space checks are not mm checks.
+- In-memory crop caching is strictly ephemeral; server restarts or multi-instance serverless
+  environments require re-rasterization or return HTTP 410.
+- Browser preview checks and WebGL software verification do NOT certify physical print readability,
+  tactile legibility for blind readers, slicer slicing/manifoldness, or expert BANA transcriber approval.
 - Physical geometry validation, review, edits, exports, and the full v1 acceptance
-  run remain pending; software geometry generation is implemented.
+  run remain pending; software geometry generation and preview are implemented.
 
 ---
 
@@ -198,3 +229,6 @@ because a later run succeeded — both are evidence.
   about lived-experience input; this file can't substitute for that).
 - "Conforms" in Section A means "matches the numeric constant," not "has been
   validated by a domain expert or BANA-certified transcriber."
+- WebGL 3D preview rendering does not guarantee that a 3D printer slicer (e.g. PrusaSlicer,
+  Bambu Studio, Cura) will slice the extruded geometry without errors, nor does it guarantee
+  tactile discriminability on a physical 3D print.

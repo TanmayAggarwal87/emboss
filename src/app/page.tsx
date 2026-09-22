@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useRef, useState } from "react"
 import { AppHeader } from "@/components/layout/AppHeader"
 import { WorkflowStepper } from "@/components/layout/WorkflowStepper"
 import { UploadDropzone } from "@/components/upload/UploadDropzone"
@@ -9,14 +9,21 @@ import { UploadFeatures } from "@/components/upload/UploadFeatures"
 import { ProcessingView } from "@/components/processing/ProcessingView"
 import { ReviewWorkspace } from "@/components/review/ReviewWorkspace"
 import { ExportView } from "@/components/export/ExportView"
+import { Button } from "@/components/ui/button"
 import { ErrorState } from "@/components/shared/ErrorState"
 import { Badge } from "@/components/ui/badge"
 import type {
   WorkflowStep,
   JobApiResponse,
   PersistedRegionItem,
-  ReviewStatus,
 } from "@/lib/frontend-types"
+
+const normalizeRegions = (data: JobApiResponse): PersistedRegionItem[] =>
+  (data.pages || []).flatMap((page) => (page.regions || []).map((region) => ({
+    ...region,
+    page_number: region.page_number ?? page.page_number,
+    job_id: region.job_id ?? data.job_id ?? "",
+  })))
 
 export default function Home() {
   const [currentStep, setCurrentStep] = useState<WorkflowStep>("upload")
@@ -29,8 +36,8 @@ export default function Home() {
     title: string
     description: string
   } | null>(null)
+  const requestIdRef = useRef(0)
 
-  // ponytail: React state handles linear workflow without redundant state stores
   const handleFileSelect = (file: File) => {
     setSelectedFile(file)
     setErrorMessage(null)
@@ -45,6 +52,7 @@ export default function Home() {
     if (!selectedFile || isProcessing) return
 
     setIsProcessing(true)
+    const activeRequest = ++requestIdRef.current
     setCurrentStep("processing")
     setErrorMessage(null)
 
@@ -58,33 +66,26 @@ export default function Home() {
       })
 
       const data: JobApiResponse = await response.json()
+      if (activeRequest !== requestIdRef.current) return
       setJobResponse(data)
+      const extractedRegions = normalizeRegions(data)
+      if (extractedRegions.length > 0) setRegions(extractedRegions)
 
-      if (!response.ok && response.status !== 207) {
+      if (!response.ok && extractedRegions.length === 0) {
         setErrorMessage({
           title: "Document processing failed",
           description:
             data.error?.message ||
-            "The document could not be processed. Please check that it is an unencrypted PDF with 3 pages or fewer.",
+            "The document could not be processed. Check the page errors below, or choose an unencrypted PDF with 2–3 pages.",
         })
         return
       }
 
-      // Extract all regions from classified pages
-      const extractedRegions: PersistedRegionItem[] = (data.pages || []).flatMap(
-        (page) => page.regions || []
-      )
-
-      setRegions(extractedRegions)
-
-      // If document is ready, user can proceed to review
       if (data.status === "ready_for_review" || extractedRegions.length > 0) {
-        // Brief pause so the completed processing stages are visible
-        setTimeout(() => {
-          setCurrentStep("review")
-        }, 800)
+        setCurrentStep("review")
       }
     } catch (err) {
+      if (activeRequest !== requestIdRef.current) return
       console.error("Upload error:", err)
       setErrorMessage({
         title: "Connection or processing error",
@@ -92,7 +93,7 @@ export default function Home() {
           "Could not communicate with the document analysis service. Please verify your connection and try again.",
       })
     } finally {
-      setIsProcessing(false)
+      if (activeRequest === requestIdRef.current) setIsProcessing(false)
     }
   }
 
@@ -100,6 +101,8 @@ export default function Home() {
     if (!jobResponse?.job_id || isRetrying) return
 
     setIsRetrying(true)
+    const activeRequest = ++requestIdRef.current
+    setErrorMessage(null)
     try {
       const response = await fetch(`/api/jobs/${jobResponse.job_id}/retry`, {
         method: "POST",
@@ -108,69 +111,34 @@ export default function Home() {
       })
 
       const data: JobApiResponse = await response.json()
-      setJobResponse(data)
+      if (activeRequest !== requestIdRef.current) return
+      if (!response.ok && !data.pages?.length) {
+        setErrorMessage({ title: "Page retry unavailable", description: data.error?.message || "The page could not be retried. Saved results are still available." })
+        return
+      }
+      setJobResponse((previous) => ({ ...previous, ...data }))
 
-      const extractedRegions: PersistedRegionItem[] = (data.pages || []).flatMap(
-        (page) => page.regions || []
-      )
-      setRegions(extractedRegions)
+      const extractedRegions = normalizeRegions(data)
+      if (extractedRegions.length > 0) setRegions((previous) => {
+        const incoming = new Map(extractedRegions.map((region) => [region.id, region]))
+        return previous.map((region) => incoming.get(region.id) || region).concat(extractedRegions.filter((region) => !previous.some((item) => item.id === region.id)))
+      })
 
       if (data.status === "ready_for_review" || extractedRegions.length > 0) {
         setCurrentStep("review")
       }
     } catch (err) {
+      if (activeRequest !== requestIdRef.current) return
       console.error("Retry error:", err)
+      setErrorMessage({ title: "Page retry unavailable", description: "Could not reach the service. Saved results are still available." })
     } finally {
-      setIsRetrying(false)
+      if (activeRequest === requestIdRef.current) setIsRetrying(false)
     }
-  }
-
-  const handleUpdateRegionStatus = (regionId: string, status: ReviewStatus) => {
-    setRegions((prev) =>
-      prev.map((r) => (r.id === regionId ? { ...r, review_status: status } : r))
-    )
-  }
-
-  const handleApplyEdit = async (
-    regionId: string,
-    instruction: string
-  ): Promise<boolean> => {
-    // ponytail: Simulated deterministic edit verification for reviewer interaction
-    // In Phase 7 full backend integration, this invokes the edit route with BANA re-validation
-    await new Promise((resolve) => setTimeout(resolve, 800))
-
-    // Reject obvious nonsensical or out-of-bounds requests
-    if (
-      instruction.toLowerCase().includes("pie") ||
-      instruction.toLowerCase().includes("scatter") ||
-      instruction.toLowerCase().includes("3d")
-    ) {
-      return false
-    }
-
-    setRegions((prev) =>
-      prev.map((r) => {
-        if (r.id === regionId) {
-          return {
-            ...r,
-            review_status: "pending", // Reset to pending for re-approval
-            extracted_data: {
-              ...r.extracted_data,
-              warnings: [
-                ...(r.extracted_data?.warnings || []),
-                `User adjustment applied: "${instruction}"`,
-              ],
-            },
-          }
-        }
-        return r
-      })
-    )
-
-    return true
   }
 
   const handleReset = () => {
+    if (isProcessing || isRetrying) return
+    requestIdRef.current += 1
     setCurrentStep("upload")
     setSelectedFile(null)
     setJobResponse(null)
@@ -179,13 +147,20 @@ export default function Home() {
     setIsProcessing(false)
   }
 
+  const handleApproveRegion = (regionId: string) => {
+    setRegions((current) => current.map((region) => region.id === regionId
+      ? { ...region, review_status: "approved" }
+      : region))
+    setCurrentStep("export")
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-[#FAFAFA] text-neutral-900 font-sans antialiased">
       {/* Top Application Header */}
       <AppHeader onReset={handleReset} />
 
       {/* Horizontal Workflow Stepper */}
-      <WorkflowStepper currentStep={currentStep} onStepClick={setCurrentStep} />
+      <WorkflowStepper currentStep={currentStep} />
 
       {/* Main Screen Content */}
       <main className="flex-1 w-full mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
@@ -243,14 +218,15 @@ export default function Home() {
         {/* STEP 2: PROCESSING */}
         {currentStep === "processing" && (
           <div className="space-y-6">
-            {errorMessage ? (
+            {errorMessage && (
               <ErrorState
                 title={errorMessage.title}
                 description={errorMessage.description}
                 actionLabel="Upload another file"
                 onAction={handleReset}
               />
-            ) : (
+            )}
+            {(!errorMessage || !!jobResponse?.pages?.length) && (
               <ProcessingView
                 jobResponse={jobResponse}
                 isLoading={isProcessing}
@@ -259,26 +235,20 @@ export default function Home() {
                 isRetrying={isRetrying}
               />
             )}
+            {regions.length > 0 && <Button variant="outline" onClick={() => setCurrentStep("review")}>Return to available previews</Button>}
           </div>
         )}
 
         {/* STEP 3: REVIEW (THE STAR OF THE PRODUCT) */}
         {currentStep === "review" && (
-          <ReviewWorkspace
-            regions={regions}
-            onUpdateRegionStatus={handleUpdateRegionStatus}
-            onApplyEdit={handleApplyEdit}
-            onProceedToExport={() => setCurrentStep("export")}
-          />
+          <div className="space-y-5">
+            <Button variant="outline" onClick={() => setCurrentStep("processing")}>Page processing details</Button>
+            <ReviewWorkspace regions={regions} onApprove={handleApproveRegion} />
+          </div>
         )}
 
-        {/* STEP 4: EXPORT */}
         {currentStep === "export" && (
-          <ExportView
-            fileName={selectedFile?.name || "document.pdf"}
-            regions={regions}
-            onReset={handleReset}
-          />
+          <ExportView fileName={selectedFile?.name ?? "accessible_document.pdf"} regions={regions} onReset={handleReset} />
         )}
       </main>
 

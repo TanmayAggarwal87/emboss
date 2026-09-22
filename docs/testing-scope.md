@@ -45,7 +45,7 @@ clipped, or rotated layouts fail locally. Header identification remains provisio
 for unstyled multi-row headers; the first-row assumption is explicitly recorded for
 human review. Image tables route to diagram processing and are unsupported unless
 they actually contain a supported chart; there is no table OCR or AI table-text
-transcription. See `docs/phase3-verification.md` for the original Phase 3 evidence.
+transcription. See `docs/table-processing-verification.md` for the original Phase 3 evidence.
 
 ## Processing scope
 
@@ -69,7 +69,7 @@ transcription. See `docs/phase3-verification.md` for the original Phase 3 eviden
 
 ## Classification recovery verification
 
-Run `npm run test:retry` alongside all four phase test scripts, `npm run lint`,
+Run `npm run test:classification-recovery` alongside all domain test scripts, `npm run lint`,
 `npx tsc --noEmit`, and `npm run build`. Tests inject errors and instant sleepers:
 they verify the 30/90-second schedule without real waiting or Gemini traffic.
 Coverage includes 429/503 recovery/exhaustion, non-transient errors, cancellation,
@@ -102,10 +102,10 @@ this verifies recovery mechanics, not provider uptime or perception consistency.
 ## Phase 4 verification
 
 ```bash
-npm run test:phase4
-npm run verify:phase4 -- --artifacts
-npm run verify:phase4 -- --database
-npm run verify:phase4 -- --live --database --artifacts
+npm run test:diagram-extraction
+npm run verify:diagram-extraction -- --artifacts
+npm run verify:diagram-extraction -- --database
+npm run verify:diagram-extraction -- --live --database --artifacts
 ```
 
 Tests and default diagnostics use fixed responses and make zero model requests.

@@ -1,6 +1,6 @@
-import { UploadError } from "@/lib/phase1/errors";
-import { createUploadHandler } from "@/lib/phase1/upload-handler";
-import { getUploadDependencies } from "@/lib/phase1/runtime";
+import { UploadError } from "@/lib/document-processing/errors";
+import { createUploadHandler } from "@/lib/document-processing/upload-handler";
+import { getUploadDependencies } from "@/lib/document-processing/runtime";
 
 export const runtime = "nodejs";
 

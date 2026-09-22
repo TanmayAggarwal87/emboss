@@ -1,6 +1,6 @@
 import React from "react"
 import { Badge } from "@/components/ui/badge"
-import { Check, X, AlertTriangle, RefreshCw, HelpCircle, FileText, Table2, BarChart3, TrendingUp, Ban } from "lucide-react"
+import { Check, X, RefreshCw, HelpCircle, FileText, Table2, BarChart3, TrendingUp, Ban } from "lucide-react"
 import type { RegionType, ReviewStatus } from "@/lib/frontend-types"
 
 export function RegionTypeBadge({
@@ -77,7 +77,7 @@ export function ReviewStatusBadge({
 }) {
   if (isEdited && status === "pending") {
     return (
-      <Badge variant="info" className={`gap-1 ${className ?? ""}`}>
+      <Badge variant="outline" className={`gap-1 border-blue-200 bg-blue-50 text-blue-700 ${className ?? ""}`}>
         <RefreshCw className="size-3" />
         Updated · Needs review
       </Badge>
@@ -87,7 +87,7 @@ export function ReviewStatusBadge({
   switch (status) {
     case "approved":
       return (
-        <Badge variant="success" className={`gap-1 ${className ?? ""}`}>
+          <Badge variant="outline" className={`gap-1 border-emerald-200 bg-emerald-50 text-emerald-700 ${className ?? ""}`}>
           <Check className="size-3" />
           Approved
         </Badge>
@@ -101,7 +101,7 @@ export function ReviewStatusBadge({
       )
     case "edit_requested":
       return (
-        <Badge variant="info" className={`gap-1 ${className ?? ""}`}>
+          <Badge variant="outline" className={`gap-1 border-blue-200 bg-blue-50 text-blue-700 ${className ?? ""}`}>
           <RefreshCw className="size-3" />
           Edit requested
         </Badge>
@@ -109,7 +109,7 @@ export function ReviewStatusBadge({
     case "pending":
     default:
       return (
-        <Badge variant="warning" className={`gap-1 ${className ?? ""}`}>
+          <Badge variant="outline" className={`gap-1 border-amber-200 bg-amber-50 text-amber-800 ${className ?? ""}`}>
           <HelpCircle className="size-3" />
           Needs review
         </Badge>

@@ -1,5 +1,4 @@
-import React from "react"
-import { AlertTriangle, ArrowRight, RotateCcw } from "lucide-react"
+import { AlertTriangle, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface ErrorStateProps {

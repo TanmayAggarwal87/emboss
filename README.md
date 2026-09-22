@@ -6,8 +6,8 @@ and turns supported bar charts and single-series line graphs into tactile,
 3D-printable STL geometry. AI is used for perception; deterministic code owns
 measurements, geometry, and BANA validation.
 
-The current web UI is still a Next.js scaffold. Later human-review, edit, and
-export stages are not yet implemented.
+The web UI uploads documents and compares original region crops with validated
+3D tactile previews. Approval, editing and export stages are not yet implemented.
 
 ## Development
 
@@ -28,40 +28,32 @@ running the application. Keep `.env.local` private and never commit it.
 Available verification commands include:
 
 ```bash
-npm run test:phase1
-npm run test:phase2
-npm run test:phase3
-npm run test:phase4
-npm run test:retry
-npm run test:phase5
+npm run test:document-processing
+npm run test:text-processing
+npm run test:table-processing
+npm run test:diagram-extraction
+npm run test:classification-recovery
+npm run test:tactile-geometry
+npm run test:preview
+npm run verify:preview
 ```
 
-Phase 5 deterministic geometry processing is enabled in the upload/retry runtime. It accepts
-validated bar charts and single-series line graphs, producing a millimetre
-`GeometryState` and a Three.js group for future preview/export. It does not yet add
-UI, STL export, or a print/slicing check. Run `npm run test:phase5` for 26 offline
-layout, mesh, validation, profile, persistence-guard and pipeline tests.
+### Running the App & Phase 6 Preview UI
 
-Run `npm run verify:phase5 -- --artifacts` for a zero-Gemini bar/line diagnostic
-and temporary source PDF, geometry JSON and top-view SVGs. Add `--database` to
-verify Supabase geometry read-back, idempotence and job readiness; the script
-removes only its synthetic job and rows afterward. No new environment values are
-required: unset plate dimensions default to 180 × 180 mm and thickness to 2 mm.
+1. Start the development server with `npm run dev` (or build and start in production mode via `npm run build && npm run start`).
+2. Navigate to `http://localhost:3000` in your web browser.
+3. Upload a 2–3 page PDF with charts or tables.
+4. When processing completes, the application automatically transitions from the "Processing" stage to the "Review" workspace.
+5. In the Review Workspace, each detected region is presented side-by-side:
+   - **Original Source**: Exact high-resolution crop rasterized directly from the PDF by MuPDF.
+   - **Tactile / Braille Preview**: For diagram regions, an interactive client-rendered Three.js 3D mesh is shown, displaying tactile elevation hierarchy, bar textures, and fixed braille labels. For text and tables, formatted braille output is displayed.
+   - **Interactive Camera Controls**: Reviewers can reset the 3D angle, switch to top-down view, zoom in/out, or orbit the model with mouse drag or accessible keyboard buttons.
 
-Known limitations: numeric positions must be distinct and monotonic; null or legacy
-source contracts fail explicitly; dense charts and long labels fail rather than
-shrinking braille; zero-valued bars remain empty but addressable groups. The default
-manufacturing profile targets a 180 × 180 mm plate including margins and a 2 mm base,
-while braille dimensions remain fixed. Accessibility and manufacturing validation
-are software checks and do not certify a physical print.
-
-Phase 4 chart extraction can be checked offline with `npm run verify:phase4`.
-For a capped real Gemini test, run `npm run verify:phase4 -- --live --database`:
-at most two chart requests, stopping on the first failure, with synthetic database
-rows removed afterward. Add `--artifacts` to inspect the generated PDF, crops and
-results locally. Existing `docs/testing-scope.md` describes the options.
-
-## Retrying failed classification pages
+**Important Preview Lifecycle & Security Notes:**
+- **Source crops are temporary**: Rasterized source crops are stored strictly in-memory within a bounded LRU cache (50 MB limit, 15-minute TTL) and served privately via `/api/jobs/[jobId]/regions/[regionId]/source`. They are never uploaded to Supabase Storage, never written to persistent disk, and never sent back to Gemini.
+- **Cache expiry & serverless behavior**: If a session expires or if the request is handled by a different serverless instance, the crop route returns HTTP 410 (Gone). The tactile geometry and review status remain intact in Postgres.
+- **Mesh reuse for export**: The Three.js mesh object rendered in the preview is the exact same geometry object that will be exported to STL in Phase 8 (`AGENTS.md` §7).
+- **Subsequent phases**: Approval, edit-prompt corrections, and ZIP package export belong to Phase 7 and Phase 8. In Phase 6, reviewers visually verify generated tactile relief against original source graphics without active edit or export actions.
 
 Call A retries only HTTP 429/503, waiting 30 then 90 seconds, with SDK retries
 disabled. Upload/retry processing stays sequential. The response includes per-page
@@ -90,15 +82,15 @@ a 180-second cooperative pipeline deadline and time for active downstream work t
 finish. Platform limits still apply; retries cannot guarantee provider availability
 or identical visual classifications. No permanent file storage was added.
 
-`npm run test:retry` runs offline fault-injection tests and spends no Gemini quota.
+`npm run test:classification-recovery` runs offline fault-injection tests and spends no Gemini quota.
 
 ## Project documentation
 
 - [Agent instructions](AGENTS.md)
 - [Task list](TASKS.md)
 - [Pipeline](docs/pipeline.md)
-- [Phase 2 verification](docs/phase2-verification.md)
-- [Phase 3 verification](docs/phase3-verification.md)
+- [Text processing verification](docs/text-processing-verification.md)
+- [Table processing verification](docs/table-processing-verification.md)
 - [Compliance report](docs/compliance-report.md)
 
 See the linked documents for architecture, supported scope, data contracts, and

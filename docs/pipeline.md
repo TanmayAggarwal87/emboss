@@ -72,7 +72,8 @@ only selected failed pages. A classified page is never reprocessed by this endpo
 even if one of its downstream region results failed. Call B behavior is unchanged.
 
 PDF bytes, validated classifications and completed region checkpoints live in a
-bounded process-local session; rasters are not retained. The session expires after
+bounded process-local session; full page rasters are not retained. Phase 6 retains
+bounded source crops separately for preview (Stage 4 below). The session expires after
 15 minutes; completed/non-retryable jobs release bytes early. At most 20 sessions
 and 64 MiB of raw PDF bytes are retained per process (metadata is additional).
 Capacity exhaustion rejects new uploads before creating a job or calling Gemini.
@@ -147,7 +148,7 @@ Phase 3 implementation details:
   certainty: every result warns that the first row is assumed to be the header and
   requires human verification. Sparse/ambiguous unruled tables are rejected.
 - liblouis translates cells with the existing UEB grade setting. Constants in
-  `src/lib/phase3/table-rules.ts` reference `docs/bana-standards.md` §§1/8: 3 blank
+  `src/lib/table-processing/table-rules.ts` reference `docs/bana-standards.md` §§1/8: 3 blank
   cells between columns, 1 blank line after headers, dot-5 guides with 1 intervening
   blank in spare text-column padding, and centered two-hyphen empty-cell indicators.
   Numeric columns align right; text columns align left. PDF grid lines are not output.
@@ -226,12 +227,34 @@ solids, including the plate, relief, texture, and braille dots. No UI or export
 feature is implied by this processing stage. The production upload/retry runtime
 always supplies the processor; earlier-phase isolated tests may omit it.
 
-## Stage 4 — Preview
+## Stage 4 — Preview (Side-by-side Review UI)
 
-- Renders the generated mesh (three.js, client-side) alongside the original source
-  region image, so a sighted reviewer can visually compare them.
-- The preview must use the **exact same mesh object** that will later be exported to
-  STL — do not regenerate geometry separately for preview vs. export.
+The upload and retry pipelines generate high-resolution PNG source crops using MuPDF
+while the original document handle is active. These crops are:
+- **Generated locally by MuPDF**: Scoped precisely to the classified region bounding box.
+- **Never sent to Gemini again**: Used exclusively for human review verification in the
+  client UI. Sighted reviewers compare the tactile 3D relief or braille formatting
+  directly against what was originally printed in the document.
+- **Temporary in-memory cache**: Held in a process-local LRU cache (bounded at 50 MB
+  and 15-minute TTL). They are not stored in Supabase tables, filesystems, or cloud buckets.
+- **HTTP 410 Gone on expiry**: The dedicated endpoint (`/api/jobs/[jobId]/regions/[regionId]/source`)
+  authenticates job/region UUID matching and emits `Cache-Control: private, no-store`.
+  If the TTL expires, the process restarts, or another serverless replica serves the
+  request, the endpoint responds with HTTP 410 (Gone). Saved database records and validated
+  geometry remain intact; reviewers can still inspect the geometry and compare with their
+  own source document.
+
+The client preview renders:
+- **Exact mesh object reuse**: The viewer constructs the 3D model using `createPreviewMesh(geometry)`,
+  retaining the exact same `THREE.Group` instance intended for Phase 8 STL export (`AGENTS.md` §7).
+  There is zero separate or duplicate geometry generation between preview and export.
+- **Interactive tactile inspection**: Includes orbit controls and keyboard-accessible buttons
+  for Top-Down view, Reset, Zoom in/out, and 3D rotation, enabling visual verification of
+  elevation hierarchies and spacing minimums.
+- **Failure isolation**: Invalid geometry or BANA violations block 3D mesh display with an
+  explicit alert banner. WebGL context loss or absence surfaces a clear, actionable message.
+- **No Phase 7/8 mutations active**: In Phase 6, approve, edit-prompt, and export actions
+  remain strictly disabled.
 
 ## Stage 5 — Human review
 

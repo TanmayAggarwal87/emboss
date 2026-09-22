@@ -9,10 +9,11 @@ import type { TextExtractedData } from "@/lib/frontend-types"
 export function BraillePreview({ data }: { data?: TextExtractedData | null }) {
   const [copied, setCopied] = useState(false)
 
-  const brailleText = data?.braille || "No braille translation available."
-  const grade = data?.braille_grade || 2
-  const code = data?.braille_code || "UEB"
-  const translationTable = data?.translation_table || "en-ueb-g2.ctb"
+  const processed = data?.status === "processed" ? data : undefined
+  const brailleText = processed?.braille || "No braille translation available."
+  const grade = processed?.braille_grade || 2
+  const code = processed?.braille_code || "UEB"
+  const translationTable = processed?.translation_table || "en-ueb-g2.ctb"
 
   const handleCopy = async () => {
     try {

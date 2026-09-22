@@ -28,61 +28,61 @@ component, not a file listing.
   consider whether that logic belongs in the parent screen instead of the shared
   component — shared components should stay genuinely shared.
 
-**Naming convention:** components are PascalCase, named for what they show, not
-where they're used (e.g. `RegionReviewCard`, not `Step5Component`).
-
 ---
 
-## shadcn/ui primitives
+## Component Registry
 
-Base components installed via `npx shadcn@latest add <name>` live under
-`components/ui/` and are **not** listed individually here — they're documented by
-shadcn itself. List a shadcn primitive here only if it's been meaningfully
-customized/wrapped for this project beyond default shadcn styling (add a row noting
-what was changed and why).
+### Layout & Navigation
 
-| shadcn component | Customized? | Notes |
-|---|---|---|
-| _unset — populate once `docs/frontend.md` and shadcn setup are finalized_ | | |
+| Component | Path | Purpose | Key Props / Variants | Reusable Contexts |
+|---|---|---|---|---|
+| `AppHeader` | `src/components/layout/AppHeader.tsx` | Top application header with brand logo, document title, and live job status | `jobId?: string`, `status?: JobStatus` | Global layout across all workflow steps |
+| `WorkflowStepper` | `src/components/layout/WorkflowStepper.tsx` | 4-step progress stepper (Upload → Processing → Review → Export) | `currentStep: 1 \| 2 \| 3 \| 4`, `onStepClick?: (step) => void` | Global layout, top of every stage view |
 
----
+### Upload Stage
 
-## Project-specific components
+| Component | Path | Purpose | Key Props / Variants | Reusable Contexts |
+|---|---|---|---|---|
+| `UploadDropzone` | `src/components/upload/UploadDropzone.tsx` | Drag-and-drop file upload zone enforcing 7 MB cap and PDF validation | `onFileSelect: (file: File) => void`, `isUploading?: boolean`, `error?: string` | Upload screen, re-upload modals |
+| `SelectedFileCard` | `src/components/upload/SelectedFileCard.tsx` | Card displaying selected PDF name, file size, page estimate, and remove action | `file: File`, `onRemove: () => void`, `disabled?: boolean` | Upload screen |
+| `UploadFeatures` | `src/components/upload/UploadFeatures.tsx` | Feature highlights explaining BANA compliance, deterministic geometry, braille | None (static presentation) | Upload landing screen |
 
-Populate this table as components are actually built. Do not pre-fill speculative
-rows for components that don't exist yet — that defeats the purpose of this being a
-source of truth. One row per real component.
+### Processing Stage
 
-| Component | Location | Purpose | Reused by / used on | Key props | Notes |
-|---|---|---|---|---|---|
-| _unset_ | _unset_ | _unset_ | _unset_ | _unset_ | _unset_ |
+| Component | Path | Purpose | Key Props / Variants | Reusable Contexts |
+|---|---|---|---|---|
+| `ProcessingView` | `src/components/processing/ProcessingView.tsx` | Multi-step live progress indicator tracking rasterization, classification, translation, modeling | `jobId: string`, `onComplete: () => void`, `onError: (err) => void` | Processing screen |
 
-### Suggested component groupings (for reference while building — not prescriptive)
+### Review Stage (Phase 6)
 
-Based on the pipeline stages in `docs/pipeline.md`, these are the natural component
-groupings likely to emerge. Use this as a checklist for "have I already built
-something like this" — not as a spec of components that must exist.
+| Component | Path | Purpose | Key Props / Variants | Reusable Contexts |
+|---|---|---|---|---|
+| `ReviewWorkspace` | `src/components/review/ReviewWorkspace.tsx` | Top-level review screen orchestrating document outline, side-by-side inspection, and action panels | `jobId: string`, `initialRegionId?: string` | Review screen |
+| `DocumentOutline` | `src/components/review/DocumentOutline.tsx` | Sidebar outline of all pages and detected regions with type icons and status badges | `regions: RegionSummary[]`, `selectedId: string`, `onSelect: (id) => void` | Review workspace sidebar |
+| `RegionNavigator` | `src/components/review/RegionNavigator.tsx` | Previous/Next region navigation bar with counter, type badge, and jump controls | `currentIndex: number`, `totalCount: number`, `onPrev: () => void`, `onNext: () => void` | Review workspace header/footer |
+| `SourcePreview` | `src/components/review/SourcePreview.tsx` | Left pane displaying original high-res MuPDF source image crop with zoom/pan and 410 fallback | `cropUrl: string`, `altText: string`, `bbox?: BoundingBox` | Review split-screen |
+| `Tactile3DViewer` | `src/components/review/Tactile3DViewer.tsx` | Right pane Three.js WebGL 3D tactile mesh preview with mouse/touch orbit & accessible camera buttons | `geometry: TactileGeometry`, `ariaLabel?: string`, `preserveDrawingBuffer?: boolean` | Review split-screen, export summary |
+| `ValidationSummary` | `src/components/review/ValidationSummary.tsx` | Collapsible panel showing deterministic BANA metrics (dimensions, rise, separation, dot pitch) | `validation: BANAValidationResult` | Review inspector |
+| `BraillePreview` | `src/components/review/BraillePreview.tsx` | Sighted-accessible braille viewer showing dot representations alongside back-translated plain text | `brailleAscii: string`, `plainText: string` | Text/table region review |
+| `TablePreview` | `src/components/review/TablePreview.tsx` | Structured braille table inspector showing columns, guide dots, and header separation | `tableData: BrailleTableResult` | Table region review |
+| `ReviewActions` | `src/components/review/ReviewActions.tsx` | Review action bar (Approve, Edit, Reject); edit/approve inactive in Phase 6, wired in Phase 7 | `regionId: string`, `status: RegionStatus`, `onApprove?: () => void`, `onReject?: () => void` | Review workspace action bar |
+| `EditRequestDialog` | `src/components/review/EditRequestDialog.tsx` | Modal dialog for sighted reviewers to enter plain-English tactile edit requests (Phase 7 ready) | `isOpen: boolean`, `onClose: () => void`, `onSubmit: (prompt: string) => void` | Review workspace |
 
-- **Upload flow:** file drop/select UI, upload progress/error states (size limit,
-  page limit, rate limit messages — see `docs/project-overview.md` for exact wording
-  context)
-- **Job status:** processing indicator, per-page/per-region status list
-- **Region review:** a card/panel per region showing its type, status
-  (pending/approved/edit_requested/rejected), and available actions — likely one
-  shared component parameterized by region type, not three separate components for
-  text/diagram/table review if their shape is similar enough
-- **Diagram preview:** the 3D mesh renderer (three.js) + side-by-side source image
-  comparison — this is likely the most complex component in the app; keep the raw
-  three.js rendering logic separated from the surrounding review UI so it can be
-  reused in both the review screen and (if ever needed) a read-only preview
-- **Edit-prompt input:** text input + submit for the plain-English edit instruction,
-  plus a way to show the edit agent's result (applied / unsupported with reason)
-- **Export/download:** final package download UI, listing what's included and what
-  was excluded (rejected regions)
-- **Braille text preview/output:** for text and table regions — how the braille
-  result is shown to a sighted reviewer (who can't read braille) is worth deciding
-  deliberately, e.g. showing the back-translated plain text alongside a
-  representation of the braille, not just raw braille dot-pattern characters
+### Export Stage
+
+| Component | Path | Purpose | Key Props / Variants | Reusable Contexts |
+|---|---|---|---|---|
+| `ExportView` | `src/components/export/ExportView.tsx` | Package overview listing generated tactile STLs, braille files, and manifest download | `jobId: string` | Export screen |
+
+### Shared & Primitives
+
+| Component | Path | Purpose | Key Props / Variants | Reusable Contexts |
+|---|---|---|---|---|
+| `StatusBadge` | `src/components/shared/StatusBadge.tsx` | Color-coded status badge for pending, processing, approved, rejected, warning, error | `status: string`, `size?: 'sm' \| 'md'` | Document outline, headers, lists |
+| `ErrorState` | `src/components/shared/ErrorState.tsx` | Structured error display with message, retry button, and troubleshooting tips | `title: string`, `message: string`, `onRetry?: () => void` | Error boundaries, failed regions |
+| `EmptyState` | `src/components/shared/EmptyState.tsx` | Neutral placeholder when no item or region is selected | `title: string`, `description?: string`, `icon?: ReactNode` | Empty workspace panels |
+| `UnsupportedState` | `src/components/shared/UnsupportedState.tsx` | Clear diagnostic message when a diagram/table exceeds v1 supported scope | `reason: string`, `detectedType: string` | Unsupported region panels |
+| `UI Primitives` | `src/components/ui/*.tsx` | Radix-based accessible UI atoms (button, card, dialog, progress, tabs, tooltip, etc.) | Standard variant props | Application-wide |
 
 ---
 

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React from "react"
 import { CheckCircle2, Loader2, Circle, AlertTriangle, ArrowRight, RotateCw } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
@@ -31,21 +31,9 @@ export function ProcessingView({
   onRetryPages,
   isRetrying = false,
 }: ProcessingViewProps) {
-  const [activeStageIndex, setActiveStageIndex] = useState(0)
-
-  // Calmer simulation of stage progression when waiting for backend response
-  useEffect(() => {
-    if (!isLoading) {
-      setActiveStageIndex(STAGES.length - 1)
-      return
-    }
-
-    const interval = setInterval(() => {
-      setActiveStageIndex((prev) => (prev < STAGES.length - 2 ? prev + 1 : prev))
-    }, 2500)
-
-    return () => clearInterval(interval)
-  }, [isLoading])
+  // The API does not expose stage-level progress. Keep the indicator honest until
+  // the response arrives instead of presenting simulated backend stages.
+  const activeStageIndex = isLoading ? 0 : STAGES.length - 1
 
   const totalPages = jobResponse?.page_count || 1
   const pages: PageSummary[] = jobResponse?.pages || []
@@ -63,9 +51,7 @@ export function ProcessingView({
 
   // Progress percentage calculation
   const progressPercent = isLoading
-    ? Math.min((activeStageIndex + 1) * 20, 85)
-    : isJobFailed
-    ? 100
+    ? pages.length > 0 ? Math.round((pages.length / totalPages) * 100) : undefined
     : 100
 
   return (
@@ -95,9 +81,10 @@ export function ProcessingView({
             <span className="font-semibold text-neutral-900">
               {isLoading ? "Processing pipeline" : "Pipeline complete"}
             </span>
-            <span className="font-mono text-neutral-500">{progressPercent}%</span>
+            <span className="font-mono text-neutral-500">{progressPercent == null ? "In progress" : `${progressPercent}%`}</span>
           </div>
-          <Progress value={progressPercent} className="h-2" />
+          <Progress value={progressPercent ?? null} className="h-2" />
+          {isLoading && <p className="text-[11px] text-neutral-500" role="status">{pages.length ? `Processed ${pages.length} of ${totalPages} pages` : "Waiting for processing results…"}</p>}
         </div>
 
         {/* Vertical Pipeline Stages */}
@@ -105,7 +92,6 @@ export function ProcessingView({
           {STAGES.map((stage, index) => {
             const isDone = !isLoading || index < activeStageIndex
             const isCurrent = isLoading && index === activeStageIndex
-            const isPending = isLoading && index > activeStageIndex
 
             return (
               <div key={stage.id} className="flex items-center gap-3 text-xs">
@@ -164,7 +150,7 @@ export function ProcessingView({
                     {isPageFailed ? (
                       <Badge variant="destructive">Failed</Badge>
                     ) : (
-                      <Badge variant="success">Completed</Badge>
+                      <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">Completed</Badge>
                     )}
                   </div>
 
@@ -190,7 +176,7 @@ export function ProcessingView({
 
       {/* Failure alert & actions */}
       {hasPartialFailures && (
-        <Alert variant="warning">
+        <Alert variant="default" className="border-amber-200 bg-amber-50 text-amber-900">
           <AlertTriangle className="size-4" />
           <AlertTitle>Non-critical warning</AlertTitle>
           <AlertDescription>

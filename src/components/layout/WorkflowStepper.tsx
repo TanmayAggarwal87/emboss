@@ -12,10 +12,8 @@ const STEPS: { id: WorkflowStep; label: string; number: number }[] = [
 
 export function WorkflowStepper({
   currentStep,
-  onStepClick,
 }: {
   currentStep: WorkflowStep
-  onStepClick?: (step: WorkflowStep) => void
 }) {
   const currentIndex = STEPS.findIndex((s) => s.id === currentStep)
   const currentStepObj = STEPS[currentIndex] || STEPS[0]

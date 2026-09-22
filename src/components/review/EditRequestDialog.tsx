@@ -12,20 +12,19 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import type { PersistedRegionItem } from "@/lib/frontend-types"
 
 interface EditRequestDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  region: PersistedRegionItem
+  region?: PersistedRegionItem
   onApplyEdit: (instruction: string) => Promise<boolean>
 }
 
 export function EditRequestDialog({
   open,
   onOpenChange,
-  region,
   onApplyEdit,
 }: EditRequestDialogProps) {
   const [instruction, setInstruction] = useState("")
@@ -107,8 +106,9 @@ export function EditRequestDialog({
 
           {statusMessage && (
             <Alert
-              variant={statusMessage.type === "success" ? "success" : "destructive"}
-              className="py-2.5"
+              variant="default"
+              data-status={statusMessage.type}
+              className={`py-2.5 ${statusMessage.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : ""}`}
             >
               {statusMessage.type === "success" ? (
                 <CheckCircle2 className="size-4" />

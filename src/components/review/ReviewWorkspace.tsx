@@ -1,228 +1,85 @@
 "use client"
 
-import React, { useState } from "react"
-import { CheckCircle2, ShieldCheck, HelpCircle, Layers } from "lucide-react"
+import { useMemo, useState } from "react"
+import dynamic from "next/dynamic"
 import { RegionNavigator } from "./RegionNavigator"
 import { SourcePreview } from "./SourcePreview"
-import { Tactile3DViewer } from "./Tactile3DViewer"
 import { ValidationSummary } from "./ValidationSummary"
 import { BraillePreview } from "./BraillePreview"
 import { TablePreview } from "./TablePreview"
-import { UnsupportedState } from "@/components/shared/UnsupportedState"
 import { DocumentOutline } from "./DocumentOutline"
-import { ReviewActions } from "./ReviewActions"
-import { EditRequestDialog } from "./EditRequestDialog"
 import { Badge } from "@/components/ui/badge"
-import type { PersistedRegionItem, ReviewStatus } from "@/lib/frontend-types"
+import type { PersistedRegionItem } from "@/lib/frontend-types"
+import { validateGeometry } from "@/lib/tactile-geometry/validate"
+import { Button } from "@/components/ui/button"
+import { Check } from "lucide-react"
 
-interface ReviewWorkspaceProps {
-  regions: PersistedRegionItem[]
-  onUpdateRegionStatus: (id: string, status: ReviewStatus) => void
-  onApplyEdit: (id: string, instruction: string) => Promise<boolean>
-  onProceedToExport: () => void
-}
+const Tactile3DViewer = dynamic(
+  () => import("./Tactile3DViewer").then((module) => module.Tactile3DViewer),
+  { ssr: false, loading: () => <p role="status" className="p-6 text-sm">Loading tactile preview…</p> }
+)
 
-export function ReviewWorkspace({
-  regions,
-  onUpdateRegionStatus,
-  onApplyEdit,
-  onProceedToExport,
-}: ReviewWorkspaceProps) {
+export function ReviewWorkspace({ regions, onApprove }: { regions: PersistedRegionItem[]; onApprove: (regionId: string) => void }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isOutlineOpen, setIsOutlineOpen] = useState(false)
-  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const index = Math.min(currentIndex, Math.max(0, regions.length - 1))
+  const region = regions[index]
+  const geometry = region?.geometry
+  const issues = useMemo(() => geometry ? validateGeometry(geometry) : [], [geometry])
+  if (!region) return <p className="p-6 text-sm">No regions are available for preview.</p>
 
-  if (!regions || regions.length === 0) {
-    return (
-      <div className="flex h-64 items-center justify-center text-xs text-neutral-500">
-        No regions found for review.
-      </div>
-    )
-  }
-
-  const currentRegion = regions[currentIndex] || regions[0]
-  const reviewedCount = regions.filter((r) => r.review_status !== "pending").length
-  const totalCount = regions.length
-  const allReviewed = reviewedCount === totalCount
-
-  const handleNext = () => {
-    if (currentIndex < regions.length - 1) {
-      setCurrentIndex(currentIndex + 1)
-    }
-  }
-
-  const handlePrevious = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1)
-    }
-  }
-
-  const handleApprove = () => {
-    onUpdateRegionStatus(currentRegion.id, "approved")
-    handleNext()
-  }
-
-  const handleReject = () => {
-    onUpdateRegionStatus(currentRegion.id, "rejected")
-    handleNext()
-  }
-
-  const handleSelectRegionById = (id: string) => {
-    const idx = regions.findIndex((r) => r.id === id)
-    if (idx !== -1) {
-      setCurrentIndex(idx)
-    }
-  }
-
-  const isUnsupportedDiagram =
-    currentRegion.type === "diagram" &&
-    (!currentRegion.geometry || currentRegion.extracted_data?.status === "failed")
-
-  const isUnsupportedTable =
-    currentRegion.type === "table" && currentRegion.extracted_data?.status === "failed"
+  const data = region.extracted_data
+  const generated = data?.kind === "diagram" && data.status === "processed" ? data.geometry_processing : undefined
+  const hasGeometry = region.type === "diagram" && generated?.status === "validated" && !!region.geometry && issues.length === 0
+  const canApprove = region.type === "diagram" ? hasGeometry : data?.status === "processed"
+  const failure = data?.status === "failed" ? data.error.message
+    : generated?.status === "failed" ? generated.error.message
+    : issues.length ? "This geometry did not pass validation and cannot be previewed."
+    : region.type === "diagram" && !hasGeometry ? "Validated tactile geometry is not available for this region." : null
 
   return (
     <div className="mx-auto max-w-7xl space-y-5 pb-8">
-      {/* Review Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-neutral-200 pb-4">
-        <div>
-          <div className="flex items-center gap-2 text-[11px] font-medium text-neutral-400">
-            <span>Document</span>
-            <span>/</span>
-            <span>Page {currentRegion.page_number}</span>
-            <span>/</span>
-            <span>Region {currentIndex + 1}</span>
-          </div>
-          <h2 className="text-xl font-semibold tracking-tight text-neutral-900 mt-1">
-            Review generated output
-          </h2>
-          <p className="text-xs text-neutral-500">
-            Compare the source region with Emboss's accessible version before approving it.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <span className="text-xs font-semibold text-neutral-900 block">
-              {reviewedCount} of {totalCount} reviewed
-            </span>
-            <span className="text-[11px] text-neutral-400">
-              {allReviewed ? "All regions ready" : "Review remaining regions"}
-            </span>
-          </div>
-          <div className="flex size-9 items-center justify-center rounded-full bg-neutral-100 text-xs font-semibold text-neutral-800">
-            {Math.round((reviewedCount / totalCount) * 100)}%
-          </div>
+      <div className="border-b border-neutral-200 pb-4">
+        <p className="text-sm text-neutral-600">Document / Page {region.page_number} / Region {index + 1}</p>
+        <h2 className="mt-1 text-xl font-semibold">Preview generated output</h2>
+        <p className="mt-1 text-sm text-neutral-600">Compare the original source with the generated output. Approve this region to include it in the export package.</p>
+      </div>
+      <RegionNavigator currentIndex={index} totalRegions={regions.length} currentRegion={region}
+        onPrevious={() => setCurrentIndex(Math.max(0, index - 1))}
+        onNext={() => setCurrentIndex(Math.min(regions.length - 1, index + 1))}
+        onToggleSidebar={() => setIsOutlineOpen(!isOutlineOpen)} isSidebarOpen={isOutlineOpen} />
+      <div className="flex flex-col items-start gap-6 xl:flex-row">
+        {isOutlineOpen && <div className="w-full shrink-0 xl:w-52">
+          <DocumentOutline regions={regions} currentRegionId={region.id}
+            onSelectRegion={(id) => { const found = regions.findIndex((item) => item.id === id); if (found >= 0) setCurrentIndex(found) }}
+            onClose={() => setIsOutlineOpen(false)} />
+        </div>}
+        <div className="grid min-w-0 flex-1 grid-cols-1 gap-6 lg:grid-cols-2 w-full">
+          <section className="min-w-0 space-y-3" aria-label="Original source">
+            <h3 className="text-sm font-semibold">Original source · Page {region.page_number}</h3>
+            <SourcePreview key={region.id} region={region} />
+          </section>
+          <section className="min-w-0 space-y-3" aria-label="Generated output">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold">{region.type === "diagram" ? "Tactile preview" : "Braille preview"}</h3>
+              {hasGeometry && <Badge variant="outline" className="text-emerald-800">Software checks passed</Badge>}
+            </div>
+            {failure ? <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-sm text-amber-950">{failure}</div>
+              : hasGeometry && region.geometry ? <>
+                <Tactile3DViewer key={region.id} geometry={region.geometry} />
+                <ValidationSummary warnings={data?.status === "processed" ? data.warnings : undefined} />
+              </>
+              : data?.kind === "table" ? <TablePreview data={data} />
+              : data?.kind === "text" ? <BraillePreview data={data} />
+              : <p className="p-6 text-sm">No processed output is available for this region.</p>}
+          </section>
         </div>
       </div>
-
-      {/* Region Navigation Bar */}
-      <RegionNavigator
-        currentIndex={currentIndex}
-        totalRegions={totalCount}
-        currentRegion={currentRegion}
-        onPrevious={handlePrevious}
-        onNext={handleNext}
-        onToggleSidebar={() => setIsOutlineOpen(!isOutlineOpen)}
-        isSidebarOpen={isOutlineOpen}
-      />
-
-      {/* Main Workspace Grid */}
-      <div className="flex flex-col lg:flex-row gap-6 items-start">
-        {/* Document Outline Sidebar */}
-        {isOutlineOpen && (
-          <div className="w-full lg:w-64 shrink-0">
-            <DocumentOutline
-              regions={regions}
-              currentRegionId={currentRegion.id}
-              onSelectRegion={handleSelectRegionById}
-              onClose={() => setIsOutlineOpen(false)}
-            />
-          </div>
-        )}
-
-        {/* Side-by-Side Comparison Workspace */}
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(420px,1.2fr)] gap-6 w-full">
-          {/* LEFT: Original Source Panel */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between px-1">
-              <span className="text-xs font-semibold text-neutral-700 uppercase tracking-wider">
-                Original Source
-              </span>
-              <span className="text-[11px] text-neutral-400">
-                Page {currentRegion.page_number}
-              </span>
-            </div>
-
-            <SourcePreview region={currentRegion} />
-          </div>
-
-          {/* RIGHT: Generated Accessible Output Panel */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between px-1">
-              <span className="text-xs font-semibold text-neutral-700 uppercase tracking-wider">
-                Generated Accessible Output
-              </span>
-              {currentRegion.geometry && (
-                <Badge variant="success" className="text-[10px] gap-1 bg-emerald-50 text-emerald-700 border-emerald-200">
-                  <CheckCircle2 className="size-3" />
-                  BANA validated
-                </Badge>
-              )}
-            </div>
-
-            {/* Region specific content */}
-            {isUnsupportedDiagram ? (
-              <UnsupportedState
-                type="diagram"
-                title="This diagram isn't supported yet"
-                reason={
-                  currentRegion.extracted_data?.error?.message ||
-                  "Emboss supports bar charts and single-series line graphs. Complex, multi-series, or pie charts are excluded."
-                }
-              />
-            ) : isUnsupportedTable ? (
-              <UnsupportedState
-                type="table"
-                title="This table is too complex for automatic conversion"
-                reason={
-                  currentRegion.extracted_data?.error?.message ||
-                  "Emboss supports simple rectangular tables without merged cells per BANA table guidelines."
-                }
-              />
-            ) : currentRegion.type === "diagram" && currentRegion.geometry ? (
-              <div className="space-y-3">
-                <Tactile3DViewer geometry={currentRegion.geometry} />
-                <ValidationSummary warnings={currentRegion.extracted_data?.warnings} />
-              </div>
-            ) : currentRegion.type === "table" ? (
-              <TablePreview data={currentRegion.extracted_data} />
-            ) : (
-              <BraillePreview data={currentRegion.extracted_data} />
-            )}
-          </div>
-        </div>
+      <div className="flex justify-end">
+        <Button type="button" disabled={!canApprove} onClick={() => onApprove(region.id)}>
+          <Check className="mr-2 size-4" /> Approve and continue to export
+        </Button>
       </div>
-
-      {/* Review Actions Bar */}
-      <ReviewActions
-        currentStatus={currentRegion.review_status}
-        onApprove={handleApprove}
-        onReject={handleReject}
-        onRequestEdit={() => setEditDialogOpen(true)}
-        onProceedToExport={onProceedToExport}
-        canExport={allReviewed}
-        isLastRegion={currentIndex === totalCount - 1}
-        isDiagram={currentRegion.type === "diagram" && !isUnsupportedDiagram}
-      />
-
-      {/* Edit Correction Request Dialog */}
-      <EditRequestDialog
-        open={editDialogOpen}
-        onOpenChange={setEditDialogOpen}
-        region={currentRegion}
-        onApplyEdit={(instruction) => onApplyEdit(currentRegion.id, instruction)}
-      />
     </div>
   )
 }

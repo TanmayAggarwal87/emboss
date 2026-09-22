@@ -9,11 +9,12 @@ import type { TableExtractedData } from "@/lib/frontend-types"
 export function TablePreview({ data }: { data?: TableExtractedData | null }) {
   const [copied, setCopied] = useState(false)
 
-  const headers = data?.headers || []
-  const rows = data?.rows || []
-  const braillePages = data?.braille_pages || []
+  const processed = data?.status === "processed" ? data : undefined
+  const headers = processed?.headers || []
+  const rows = processed?.rows || []
+  const braillePages = processed?.braille_pages || []
   const brailleTable = braillePages.join("\n\n---\n\n") || "No braille table available."
-  const layout = data?.layout || "aligned"
+  const layout = processed?.layout || "aligned"
 
   const handleCopy = async () => {
     try {

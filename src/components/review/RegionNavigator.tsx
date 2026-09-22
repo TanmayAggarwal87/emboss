@@ -23,10 +23,10 @@ export function RegionNavigator({
   onToggleSidebar,
   isSidebarOpen,
 }: RegionNavigatorProps) {
-  const chartType = currentRegion.extracted_data?.data?.chart_type
+  const chartType = currentRegion.extracted_data?.kind === "diagram" && currentRegion.extracted_data.status === "processed" ? currentRegion.extracted_data.data.chart_type : undefined
   const isUnsupported =
     currentRegion.extracted_data?.status === "failed" ||
-    (currentRegion.type === "diagram" && !currentRegion.geometry && currentRegion.extracted_data?.error)
+    (currentRegion.type === "diagram" && !currentRegion.geometry)
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-white px-4 py-2.5 shadow-xs">

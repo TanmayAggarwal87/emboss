@@ -1,127 +1,76 @@
 "use client"
 
-import React, { useState } from "react"
-import { ZoomIn, ZoomOut, RotateCw, FileText, BarChart3, Table2, Layers } from "lucide-react"
+import { useEffect, useState } from "react"
+import { RotateCw, ZoomIn, ZoomOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Tooltip, TooltipProvider } from "@/components/ui/tooltip"
 import type { PersistedRegionItem } from "@/lib/frontend-types"
 
-interface SourcePreviewProps {
-  region: PersistedRegionItem
-  className?: string
-}
+type ImageState = { status: "loading" } | { status: "ready"; url: string } | { status: "error"; message: string }
 
-export function SourcePreview({ region, className }: SourcePreviewProps) {
+export function SourcePreview({ region, className }: { region: PersistedRegionItem; className?: string }) {
   const [zoom, setZoom] = useState(1)
+  const [attempt, setAttempt] = useState(0)
+  const [image, setImage] = useState<ImageState>({ status: "loading" })
+  const sourceUrl = region.source_preview?.url
+  const sourceError = region.source_preview?.error
 
-  const handleZoomIn = () => setZoom((prev) => Math.min(prev + 0.25, 2.5))
-  const handleZoomOut = () => setZoom((prev) => Math.max(prev - 0.25, 0.5))
-  const handleReset = () => setZoom(1)
-
-  const { bounding_box, page_number, type } = region
-
-  // Extracted raw source text preview (if text or table)
-  const plainText =
-    region.extracted_data?.plain_text ||
-    (region.extracted_data?.headers &&
-      `${region.extracted_data.headers.join(" | ")}\n` +
-        region.extracted_data.rows?.map((r: string[]) => r.join(" | ")).join("\n"))
+  useEffect(() => {
+    const controller = new AbortController()
+    let objectUrl: string | undefined
+    void Promise.resolve().then(async () => {
+      if (controller.signal.aborted) return
+      setImage({ status: "loading" })
+      setZoom(1)
+      try {
+        if (!sourceUrl) throw new Error(sourceError || "Source crop is not available for this region. Refer to your original PDF.")
+        const url = new URL(sourceUrl, window.location.origin)
+        if (url.origin !== window.location.origin) throw new Error("The source preview address is invalid.")
+        const response = await fetch(url, { cache: "no-store", signal: controller.signal })
+        if (response.status === 410) throw new Error("This temporary source crop has expired or is unavailable. Refer to your original PDF; generated results are still available.")
+        if (!response.ok || !response.headers.get("content-type")?.startsWith("image/png")) {
+          throw new Error("The source crop could not be loaded. Try loading the crop again.")
+        }
+        const blob = await response.blob()
+        if (controller.signal.aborted) return
+        objectUrl = URL.createObjectURL(blob)
+        setImage({ status: "ready", url: objectUrl })
+      } catch (error) {
+        if (!controller.signal.aborted) setImage({ status: "error", message: error instanceof Error ? error.message : "The source crop could not be loaded." })
+      }
+    })
+    return () => {
+      controller.abort()
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [sourceUrl, sourceError, attempt])
 
   return (
-    <TooltipProvider>
-      <div className={`relative flex flex-col rounded-lg border border-neutral-200 bg-neutral-50 overflow-hidden ${className ?? ""}`}>
-        {/* Source Canvas Container */}
-        <div className="relative h-[380px] w-full overflow-auto flex items-center justify-center p-6 bg-neutral-100/60">
-          <div
-            style={{ transform: `scale(${zoom})`, transformOrigin: "center center" }}
-            className="transition-transform duration-150 ease-out"
-          >
-            {/* Visual Box Container representing the PDF crop / region */}
-            <div className="w-[320px] sm:w-[380px] rounded-lg border border-neutral-300 bg-white p-6 shadow-xs text-neutral-800">
-              <div className="flex items-center justify-between border-b border-neutral-100 pb-3 mb-4">
-                <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">
-                  Page {page_number} · Source Region
-                </span>
-                <span className="text-[11px] font-mono text-neutral-400">
-                  [{Math.round(bounding_box.x)}, {Math.round(bounding_box.y)}, {Math.round(bounding_box.width)}, {Math.round(bounding_box.height)}]
-                </span>
-              </div>
-
-              {plainText ? (
-                <div className="max-h-[220px] overflow-y-auto font-sans text-xs text-neutral-800 leading-relaxed whitespace-pre-wrap select-text">
-                  {plainText}
-                </div>
-              ) : type === "diagram" ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center text-neutral-500 space-y-3">
-                  <div className="rounded-lg bg-neutral-100 p-3 text-neutral-700">
-                    <BarChart3 className="size-8 stroke-[1.5]" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-neutral-800">
-                      {region.extracted_data?.data?.chart_type === "line_graph_single_series"
-                        ? "Single-Series Line Graph"
-                        : "Bar Chart"}
-                    </p>
-                    <p className="text-[11px] text-neutral-500 mt-1 max-w-[240px]">
-                      Cropped from PDF Page {page_number} at coordinates (x: {Math.round(bounding_box.x)}, y: {Math.round(bounding_box.y)})
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-neutral-400 text-xs">
-                  <FileText className="size-8 stroke-1 mb-2 text-neutral-300" />
-                  <span>Document region crop</span>
-                </div>
-              )}
-            </div>
+    <div className={`relative flex min-w-0 flex-col overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 ${className ?? ""}`}>
+      <div className="relative h-[380px] w-full overflow-auto bg-neutral-100/60 p-6">
+        {image.status === "ready" ? (
+          // Blob URLs are temporary and must bypass the persistent image optimizer.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={image.url} alt={`Source crop for page ${region.page_number}, ${region.type} region`}
+            onError={() => setImage({ status: "error", message: "The source image could not be displayed. Try loading the crop again." })}
+            style={{ width: `${zoom * 100}%`, maxWidth: "none" }} className="mx-auto h-auto"
+          />
+        ) : image.status === "loading" ? (
+          <p role="status" className="p-6 text-center text-sm text-neutral-600">Loading source crop…</p>
+        ) : (
+          <div className="p-6 text-center text-sm text-neutral-600">
+            <p role="alert">{image.message}</p>
+            {sourceUrl && <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setAttempt((value) => value + 1)}>Retry crop</Button>}
           </div>
-        </div>
-
-        {/* Floating Zoom Controls */}
-        <div className="absolute top-3 right-3 flex flex-col gap-1.5 rounded-lg border border-neutral-200 bg-white/90 p-1 shadow-xs backdrop-blur-xs">
-          <Tooltip content="Zoom in">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              onClick={handleZoomIn}
-              className="size-7 text-neutral-600 hover:text-neutral-900"
-            >
-              <ZoomIn className="size-3.5" />
-            </Button>
-          </Tooltip>
-
-          <Tooltip content="Reset zoom">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              onClick={handleReset}
-              className="size-7 text-neutral-600 hover:text-neutral-900"
-            >
-              <RotateCw className="size-3.5" />
-            </Button>
-          </Tooltip>
-
-          <Tooltip content="Zoom out">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              onClick={handleZoomOut}
-              className="size-7 text-neutral-600 hover:text-neutral-900"
-            >
-              <ZoomOut className="size-3.5" />
-            </Button>
-          </Tooltip>
-        </div>
-
-        {/* Bottom meta footer */}
-        <div className="flex items-center justify-between border-t border-neutral-200 bg-white/80 px-3 py-1.5 text-[11px] text-neutral-500">
-          <span>Source crop: {Math.round(bounding_box.width)} × {Math.round(bounding_box.height)} pt</span>
-          <span className="font-mono text-neutral-400">Zoom: {Math.round(zoom * 100)}%</span>
-        </div>
+        )}
       </div>
-    </TooltipProvider>
+      <div className="absolute right-3 top-3 flex flex-col gap-1 rounded-lg border border-neutral-200 bg-white p-1">
+        <Button type="button" aria-label="Zoom source in" disabled={image.status !== "ready"} variant="ghost" size="icon-sm" onClick={() => setZoom((value) => Math.min(value + .25, 2.5))}><ZoomIn className="size-4" /></Button>
+        <Button type="button" aria-label="Reset source zoom" disabled={image.status !== "ready"} variant="ghost" size="icon-sm" onClick={() => setZoom(1)}><RotateCw className="size-4" /></Button>
+        <Button type="button" aria-label="Zoom source out" disabled={image.status !== "ready"} variant="ghost" size="icon-sm" onClick={() => setZoom((value) => Math.max(value - .25, .5))}><ZoomOut className="size-4" /></Button>
+      </div>
+      <div className="flex justify-between border-t border-neutral-200 bg-white px-3 py-2 text-xs text-neutral-600">
+        <span>Page {region.page_number} · Source crop</span><span>Zoom: {Math.round(zoom * 100)}%</span>
+      </div>
+    </div>
   )
 }

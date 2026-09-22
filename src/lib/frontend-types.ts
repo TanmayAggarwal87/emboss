@@ -1,4 +1,7 @@
-import type { GeometryState } from "./phase5/types"
+import type { GeometryState } from "./tactile-geometry/types"
+import type { TextRegionResult } from "./text-processing/types"
+import type { TableRegionResult } from "./table-processing/types"
+import type { DiagramRegionResult } from "./diagram-extraction/types"
 
 export type WorkflowStep = "upload" | "processing" | "review" | "export"
 
@@ -13,61 +16,16 @@ export interface BoundingBox {
   height: number
 }
 
-export interface TextExtractedData {
-  kind: "text"
-  status: "processed" | "failed"
-  source?: "text_layer" | "ocr"
-  plain_text?: string
-  braille?: string
-  braille_grade?: 1 | 2
-  braille_code?: "UEB"
-  translation_table?: string
-  liblouis_version?: string
-  ocr_confidence?: number | null
-  warnings?: string[]
-  error?: { code: string; message: string }
-}
+export type TextExtractedData = TextRegionResult
+export type TableExtractedData = TableRegionResult
+export type DiagramExtractedData = DiagramRegionResult
+export type ExtractedData = TextExtractedData | TableExtractedData | DiagramExtractedData
 
-export interface TableExtractedData {
-  kind: "table"
-  status: "processed" | "failed"
-  source?: "text_layer"
-  headers?: string[]
-  rows?: string[][]
-  braille_headers?: string[]
-  braille_rows?: string[][]
-  braille_pages?: string[]
-  layout?: "aligned" | "vertical_list"
-  column_widths_cells?: number[]
-  column_alignment?: ("left" | "right")[]
-  braille_grade?: 1 | 2
-  braille_code?: "UEB"
-  translation_table?: string
-  liblouis_version?: string
-  warnings?: string[]
-  error?: { code: string; message: string }
+export interface SourcePreview {
+  url?: string
+  error?: string
+  expires_at?: string
 }
-
-export interface DiagramExtractedData {
-  kind: "diagram"
-  status: "processed" | "failed"
-  source?: "gemini"
-  data?: {
-    chart_type: "bar_chart" | "line_graph_single_series"
-    axis_labels: { x: string | null; y: string | null }
-    data_points: { label: string; value: number | null }[]
-    series_label: string | null
-  }
-  needs_data_review?: boolean
-  warnings?: string[]
-  geometry_processing?: {
-    status: "validated" | "failed"
-    error?: { code: string; message: string }
-  }
-  error?: { code: string; message: string }
-}
-
-export type ExtractedData = TextExtractedData | TableExtractedData | DiagramExtractedData | any
 
 export interface PersistedRegionItem {
   id: string
@@ -76,8 +34,9 @@ export interface PersistedRegionItem {
   type: RegionType
   bounding_box: BoundingBox
   review_status: ReviewStatus
-  extracted_data: ExtractedData | null
-  geometry: GeometryState | null
+  extracted_data?: ExtractedData | null
+  geometry?: GeometryState | null
+  source_preview?: SourcePreview
 }
 
 export interface PageSummary {

@@ -21,7 +21,6 @@ export function ReviewActions({
   onRequestEdit,
   onProceedToExport,
   canExport = false,
-  isLastRegion = false,
   isDiagram = false,
 }: ReviewActionsProps) {
   return (

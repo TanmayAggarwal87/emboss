@@ -1,5 +1,4 @@
-import React from "react"
-import { ScanSearch, Cpu, CheckCircle2, ShieldCheck, ArrowRight } from "lucide-react"
+import { ShieldCheck, ArrowRight } from "lucide-react"
 
 export function UploadFeatures() {
   return (

@@ -73,7 +73,7 @@ Goal: Stage 3a from `docs/pipeline.md`.
       code path clearly separate from the normal path per `docs/pipeline.md` Stage 3a)
 - [x] Confirm zero Gemini calls happen anywhere in this phase under normal conditions
 
-Verification evidence and repeatable commands: `docs/phase2-verification.md`.
+Verification evidence and repeatable commands: `docs/text-processing-verification.md`.
 
 **Phase 2 is done when:** a text region from your test PDF produces correct braille
 output, verified against a known-correct braille reference for the same text if
@@ -95,7 +95,7 @@ Goal: Stage 3b from `docs/pipeline.md`.
       `docs/bana-standards.md` §8
 - [x] Store result in `regions.extracted_data` for table regions
 
-Verification: `docs/phase3-verification.md`. Checked against ruled/aligned fixtures
+Verification: `docs/table-processing-verification.md`. Checked against ruled/aligned fixtures
 and explicit malformed examples. Unstyled multi-row headers remain a documented
 first-row-assumption limitation requiring human review; this is not a claim of
 universal table detection. Image routing now connects to Phase 4 below. Physical
@@ -198,16 +198,29 @@ Phase 6 UI or export implementation was added.
 
 Goal: Stage 4 from `docs/pipeline.md`.
 
-- [ ] Render the validated three.js mesh client-side
-- [ ] Side-by-side layout: generated mesh + original source region image
-- [ ] Confirm the preview renders the exact same mesh object that will be used for
+- [x] Render the validated three.js mesh client-side
+- [x] Side-by-side layout: generated mesh + original source region image
+- [x] Confirm the preview renders the exact same mesh object that will be used for
       export later (no separate/duplicate geometry generation for preview — see
       `AGENTS.md` §7)
-- [ ] Basic camera controls (orbit/rotate) so raised-height detail is visible from
+- [x] Basic camera controls (orbit/rotate) so raised-height detail is visible from
       multiple angles
 
 **Phase 6 is done when:** a reviewer can look at the 3D preview next to the source
 diagram and visually confirm whether it's correct, without needing to read raw data.
+
+Verified 2026-09-18: 5 Phase 6 tests and all 95 regression tests from Phases 1–5 passed;
+lint (0 errors, 0 warnings), strict TypeScript (`npx tsc --noEmit`), and Next.js production
+build (`npm run build`) passed cleanly. Review workspace renders side-by-side layout with
+the original source crop (served via temporary in-memory route) and interactive Three.js
+mesh constructed directly from validated geometry. Mesh identity is preserved across
+preview and export handles. Camera controls provide top-down and orbit controls with
+keyboard-accessible labels.
+Remaining limitations: Browser preview verification does not prove physical 3D print
+readability, slicer tolerance, or expert tactile reader approval. Temporary source crops
+are held in-memory (bounded LRU, 15-minute TTL) and return HTTP 410 when expired; they
+are not persisted in Supabase. Approval, editing, and export actions remain reserved for
+Phases 7 and 8.
 
 ---
 
@@ -237,7 +250,7 @@ updated preview.
 Goal: Stage 6 and 7 from `docs/pipeline.md`.
 
 - [ ] STL export from the same mesh object used in preview, for each approved
-      diagram region
+      diagram     
 - [ ] Braille text export for approved text and table regions, page-ordered
 - [ ] Rejected regions excluded entirely — confirm no placeholder/empty content is
       exported for them
