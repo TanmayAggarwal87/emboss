@@ -19,7 +19,12 @@ const Tactile3DViewer = dynamic(
   { ssr: false, loading: () => <p role="status" className="p-6 text-sm">Loading tactile preview…</p> }
 )
 
-export function ReviewWorkspace({ regions, onApprove }: { regions: PersistedRegionItem[]; onApprove: (regionId: string) => void }) {
+export function ReviewWorkspace({ regions, onApprove, onExport, approvingRegionId }: {
+  regions: PersistedRegionItem[];
+  onApprove: (regionId: string) => void;
+  onExport: () => void;
+  approvingRegionId: string | null;
+}) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isOutlineOpen, setIsOutlineOpen] = useState(false)
   const index = Math.min(currentIndex, Math.max(0, regions.length - 1))
@@ -42,7 +47,7 @@ export function ReviewWorkspace({ regions, onApprove }: { regions: PersistedRegi
       <div className="border-b border-neutral-200 pb-4">
         <p className="text-sm text-neutral-600">Document / Page {region.page_number} / Region {index + 1}</p>
         <h2 className="mt-1 text-xl font-semibold">Preview generated output</h2>
-        <p className="mt-1 text-sm text-neutral-600">Compare the original source with the generated output. Approve this region to include it in the export package.</p>
+        <p className="mt-1 text-sm text-neutral-600">Compare the original source with the generated output. Approve regions one at a time; you can export all approved regions when you are ready.</p>
       </div>
       <RegionNavigator currentIndex={index} totalRegions={regions.length} currentRegion={region}
         onPrevious={() => setCurrentIndex(Math.max(0, index - 1))}
@@ -75,10 +80,19 @@ export function ReviewWorkspace({ regions, onApprove }: { regions: PersistedRegi
           </section>
         </div>
       </div>
-      <div className="flex justify-end">
-        <Button type="button" disabled={!canApprove} onClick={() => onApprove(region.id)}>
-          <Check className="mr-2 size-4" /> Approve and continue to export
-        </Button>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-neutral-600" aria-live="polite">
+          {regions.filter((item) => item.review_status === "approved").length} of {regions.length} regions approved
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {regions.some((item) => item.review_status === "approved") &&
+            <Button type="button" variant="outline" onClick={onExport}>Export approved regions</Button>}
+          <Button type="button" disabled={!canApprove || region.review_status === "approved" || approvingRegionId !== null}
+            onClick={() => onApprove(region.id)}>
+            <Check className="mr-2 size-4" />
+            {approvingRegionId === region.id ? "Saving approval…" : region.review_status === "approved" ? "Region approved" : "Approve region"}
+          </Button>
+        </div>
       </div>
     </div>
   )

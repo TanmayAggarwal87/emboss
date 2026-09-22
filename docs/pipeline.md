@@ -253,8 +253,11 @@ The client preview renders:
   elevation hierarchies and spacing minimums.
 - **Failure isolation**: Invalid geometry or BANA violations block 3D mesh display with an
   explicit alert banner. WebGL context loss or absence surfaces a clear, actionable message.
-- **No Phase 7/8 mutations active**: In Phase 6, approve, edit-prompt, and export actions
-  remain strictly disabled.
+- Region approval is persisted independently. Approving a region keeps the reviewer in
+  the review workspace so other regions can be reviewed and approved separately.
+- Export is available once at least one region is approved. Each approved region can be
+  downloaded individually or included with the other approved files in one ZIP package.
+- Edit-prompt and reject actions remain outside the active review flow.
 
 ## Stage 5 — Human review
 

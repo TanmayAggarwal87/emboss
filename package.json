@@ -14,6 +14,7 @@
     "test:classification-recovery": "node --conditions=react-server --experimental-transform-types --test tests/classification-recovery/*.test.ts",
     "test:tactile-geometry": "node --conditions=react-server --experimental-transform-types --test tests/tactile-geometry/*.test.ts",
     "test:preview": "node --conditions=react-server --experimental-transform-types --test tests/preview/*.test.ts",
+    "test:review": "node --conditions=react-server --experimental-transform-types --test tests/review/*.test.ts",
     "verify:preview": "node --conditions=react-server --experimental-transform-types scripts/verify-preview-browser.ts",
     "verify:tactile-geometry": "node --conditions=react-server --experimental-transform-types scripts/verify-tactile-geometry.ts",
     "verify:diagram-extraction": "node --conditions=react-server --experimental-transform-types scripts/verify-diagram-extraction.ts",

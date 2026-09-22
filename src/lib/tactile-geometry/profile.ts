@@ -21,7 +21,7 @@ export const DEFAULT_PROFILE = Object.freeze({
 export type PhysicalProfile = { [K in keyof typeof DEFAULT_PROFILE]: number };
 const positive = z.number().finite().positive();
 export const profileSchema = z.object({
-  maxWidth: positive.max(DEFAULT_PROFILE.maxWidth), maxHeight: positive.max(DEFAULT_PROFILE.maxHeight), baseThickness: positive,
+  maxWidth: positive, maxHeight: positive, baseThickness: positive,
   gridWidth: positive, axisWidth: positive, dataWidth: positive,
   gridRise: positive, axisRise: positive, dataRise: positive,
   minFeatureWidth: positive.min(DEFAULT_PROFILE.minFeatureWidth),

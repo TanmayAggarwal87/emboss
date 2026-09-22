@@ -12,6 +12,26 @@ import type {
 } from "./types.ts";
 
 export class SupabaseJobRepository implements JobRepository {
+  async approveRegion(jobId: string, regionId: string): Promise<{ id: string; review_status: "approved" }> {
+    const supabase = getSupabaseAdmin();
+    const { data: region, error: readError } = await supabase.from("regions")
+      .select("id, type, extracted_data, geometry")
+      .eq("job_id", jobId).eq("id", regionId).maybeSingle();
+    if (readError) throw new UploadError(503, "DATABASE_ERROR", "The region could not be loaded for approval.");
+    if (!region) throw new UploadError(404, "REGION_NOT_FOUND", "This region could not be found in the document.");
+    if (!isApprovableRegion(region.type, region.extracted_data, region.geometry)) {
+      throw new UploadError(422, "REGION_NOT_READY", "This region has no successfully processed and validated output to approve.");
+    }
+
+    const { data, error } = await supabase.from("regions")
+      .update({ review_status: "approved" })
+      .eq("job_id", jobId).eq("id", regionId)
+      .select("id, review_status").maybeSingle();
+    if (error) throw new UploadError(503, "DATABASE_ERROR", "The approval could not be saved. Please try again.");
+    if (!data) throw new UploadError(404, "REGION_NOT_FOUND", "This region could not be found in the document.");
+    return { id: data.id, review_status: "approved" };
+  }
+
   async createJob(pageCount: number): Promise<string> {
     const { data, error } = await getSupabaseAdmin()
       .from("jobs")
@@ -102,6 +122,18 @@ export class SupabaseJobRepository implements JobRepository {
       .update({ status: "ready_for_review", error_message: null }).eq("id", jobId);
     if (error) throw new UploadError(503, "DATABASE_ERROR", "The validated results were saved, but review readiness could not be recorded.");
   }
+}
+
+function isApprovableRegion(type: string, extracted: unknown, geometry: unknown): boolean {
+  if (!extracted || typeof extracted !== "object" || Array.isArray(extracted)) return false;
+  const result = extracted as { kind?: unknown; status?: unknown; geometry_processing?: { status?: unknown }; data?: unknown };
+  if (result.kind !== type || result.status !== "processed") return false;
+  if (type !== "diagram") return type === "text" || type === "table";
+  if (result.geometry_processing?.status !== "validated" || !geometry || typeof geometry !== "object") return false;
+  const source = diagramSchema.safeParse(result.data);
+  const geometrySource = diagramSchema.safeParse((geometry as { source?: unknown }).source);
+  return !!source.success && !!geometrySource.success && validateGeometry(geometry).length === 0 &&
+    JSON.stringify(source.data) === JSON.stringify(geometrySource.data);
 }
 
 export function regionRowId(jobId: string, pageNumber: number, regionId: string): string {

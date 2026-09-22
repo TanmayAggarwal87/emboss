@@ -88,6 +88,37 @@ data 0.9, axis 0.55, grid 0.25 mm above the base; widths appear in section 11.
 - Bar orientation (vertical/horizontal) should match the source print chart unless
   physically impossible to reproduce.
 
+  ## 5a. Long labels — legend/key fallback (applies to bar charts and line graphs)
+
+Per BANA labeling guidance: if a label requires more than 2-3 braille characters, do
+not place the full label directly next to the graphic element. Instead, assign the
+label a short 2-character code (e.g. "bo" for "Books", "he" for "Headsets") and place
+a full-text index/key at the bottom of the page, listing each code and its full
+label. This is the standard, sanctioned way to fit more content within BANA's
+spacing minimums — it is not a simplification or a compromise, it is the documented
+correct approach for this situation.
+
+**Layout decision order for diagram labels (apply in this order):**
+1. Attempt the layout with full labels first.
+2. If minimum-legal layout with full labels exceeds max plate size (see §10), do
+   NOT fail immediately. Instead, regenerate using 2-character codes per element +
+   a legend key, and re-check fit.
+3. Only fail with the "does not fit" message (see §10) if the layout still exceeds
+   max plate size even with the legend/key applied.
+
+**Legend key placement and formatting:**
+- Place the key at the bottom of the tactile page, following the same label
+  clearance rules as §4 (3.18–6.35 mm from any graphic line).
+- Each key entry: `<2-char code> <space> <full label in braille>`, one entry per
+  line, following the general line-to-line pitch minimum (§1, ≥10 mm for legend
+  plates).
+- Codes must be unique within a single diagram — do not reuse a code for two
+  different labels on the same chart.
+- Codes should be derived deterministically from the label (e.g. first two letters,
+  disambiguated with a second pass if a collision occurs) — do not let an AI model
+  invent codes; this is a deterministic code responsibility, same as all other
+  layout decisions per `AGENTS.md` §2.
+
 ## 6. Line graphs (single-series only, v1)
 
 - Plotted graph points are at least **3 mm** across; v1 uses a 3 mm square.

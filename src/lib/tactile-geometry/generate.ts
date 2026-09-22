@@ -2,7 +2,7 @@ import "server-only";
 import { Box3, Mesh } from "three";
 import { diagramSchema, type SupportedDiagramData } from "../diagram-extraction/schema.ts";
 import { translateBraille } from "../text-processing/braille.ts";
-import { ACCESSIBILITY as A, profileSchema, type PhysicalProfile } from "./profile.ts";
+import { ACCESSIBILITY as A, BRAILLE, profileSchema, type PhysicalProfile } from "./profile.ts";
 import { bounds, brailleSize, elementDistance } from "./measure.ts";
 import type { BarElement, GeometryElement, GeometryProcessor, GeometryResult, GeometryState, LabelElement, LineElement, XY } from "./types.ts";
 import { validateGeometry } from "./validate.ts";
@@ -12,6 +12,8 @@ export class GeometryError extends Error {
   constructor(readonly code: string, message: string) { super(message); }
 }
 const fail = (message: string): never => { throw new GeometryError("GEOMETRY_TOO_DENSE", message); };
+const layoutDoesNotFit = (required: { width: number; height: number }, profile: PhysicalProfile): GeometryError =>
+  new GeometryError("GEOMETRY_LAYOUT_DOES_NOT_FIT", `Required ${required.width.toFixed(2)} × ${required.height.toFixed(2)} mm; configured maximum ${profile.maxWidth.toFixed(2)} × ${profile.maxHeight.toFixed(2)} mm.`);
 type Tick = { fraction: number; label: LabelElement };
 
 export class DeterministicGeometryProcessor implements GeometryProcessor {
@@ -45,6 +47,27 @@ export class DeterministicGeometryProcessor implements GeometryProcessor {
 }
 
 export function generateGeometry(input: SupportedDiagramData, profile: PhysicalProfile, grade: 1 | 2): GeometryState {
+  try {
+    return generateGeometryAttempt(input, profile, grade, false);
+  } catch (error) {
+    if (!(error instanceof GeometryError) || error.code !== "GEOMETRY_LAYOUT_DOES_NOT_FIT") throw error;
+    const parsed = diagramSchema.safeParse(input);
+    if (!parsed.success || parsed.data.chart_type === "unsupported" || parsed.data.independent_axis.type !== "categorical") {
+      throw error;
+    }
+    try {
+      return generateGeometryAttempt(input, profile, grade, true);
+    } catch (legendError) {
+      if (legendError instanceof GeometryError && legendError.code === "GEOMETRY_LAYOUT_DOES_NOT_FIT") {
+        fail(`This chart cannot fit the configured plate while preserving tactile minimums, even with short labels and a Braille legend. ${legendError.message}`);
+      }
+      throw legendError;
+    }
+  }
+}
+
+function generateGeometryAttempt(input: SupportedDiagramData, profile: PhysicalProfile, grade: 1 | 2,
+  useLegendFallback: boolean): GeometryState {
   const parsed = diagramSchema.safeParse(input);
   if (!parsed.success || parsed.data.chart_type === "unsupported") throw new GeometryError("GEOMETRY_DATA_INVALID", "This chart lacks validated orientation or axis data. Analyze it again before geometry generation.");
   const data = parsed.data;
@@ -55,6 +78,8 @@ export function generateGeometry(input: SupportedDiagramData, profile: PhysicalP
   }
   const horizontal = data.chart_type === "bar_chart" && data.orientation === "horizontal";
   const bars = data.chart_type === "bar_chart";
+  const legendPlan = useLegendFallback && data.independent_axis.type === "categorical"
+    ? makeCategoryCodes(data.independent_axis.values) : { codes: [], entries: [] };
   const values = data.data_points.map((point) => point.value!);
   const independent = data.independent_axis.type === "numeric" ? data.independent_axis.values as number[] : values.map((_, i) => i);
   const domain: [number, number] = [independent[0], independent.at(-1)!];
@@ -74,7 +99,7 @@ export function generateGeometry(input: SupportedDiagramData, profile: PhysicalP
   };
   const independentTicks: Tick[] = data.independent_axis.values.map((value, i) => ({
     fraction: horizontal ? 1 - fractions[i] : fractions[i],
-    label: label(`label-${horizontal ? "y" : "x"}-${i}`, String(value), horizontal ? "y-axis" : "x-axis"),
+    label: label(`label-${horizontal ? "y" : "x"}-${i}`, legendPlan.codes[i] ?? String(value), horizontal ? "y-axis" : "x-axis"),
   }));
   const dependentValues = [...new Set([min, 0, max])].sort((a, b) => a - b);
   const dependentTicks = dependentValues.map((value, i) => ({ fraction: (value - min) / (max - min),
@@ -102,7 +127,7 @@ export function generateGeometry(input: SupportedDiagramData, profile: PhysicalP
   const x = yAxisX + p.axisWidth / 2 + A.separation + extentX;
   const y = xAxisY + p.axisWidth / 2 + A.separation + extentY;
   if (x + width + extentX + A.margin > p.maxWidth || y + height + extentY + A.margin > p.maxHeight) {
-    fail("This chart cannot fit the configured plate while preserving braille, bar area, spacing and numeric proportions. Simplify or split the source chart.");
+    throw layoutDoesNotFit({ width: x + width + extentX + A.margin, height: y + height + extentY + A.margin }, p);
   }
   const elements: GeometryElement[] = [];
   const line = (id: string, role: LineElement["role"], from: XY, to: XY): LineElement => ({
@@ -160,6 +185,14 @@ export function generateGeometry(input: SupportedDiagramData, profile: PhysicalP
     if (grid.segments.length) elements.push(grid);
   });
   let top = Math.max(...elements.map((e) => bounds(e).maxY));
+  let nextLegendY = Math.min(...elements.map((element) => bounds(element).minY)) - A.labelClearance;
+  legendPlan.entries.forEach((entry, index) => {
+    const key = label(`legend-key-${index}`, `${entry.code} ${entry.label}`, null);
+    key.x = A.margin;
+    key.y = nextLegendY - key.height;
+    elements.push(key);
+    nextLegendY = key.y - (BRAILLE.linePitch - key.height);
+  });
   const headers = [["label-x-title", data.axis_labels.x ? `x: ${data.axis_labels.x}` : null],
     ["label-y-title", data.axis_labels.y ? `y: ${data.axis_labels.y}` : null], ["legend-0", data.series_label]];
   for (const [id, text] of headers) if (text?.trim()) {
@@ -167,17 +200,60 @@ export function generateGeometry(input: SupportedDiagramData, profile: PhysicalP
     header.x = A.margin; header.y = top + A.separation;
     elements.push(header); top = header.y + header.height;
   }
+  const minimumY = Math.min(...elements.map((element) => bounds(element).minY));
+  const yOffset = useLegendFallback ? Math.max(0, A.margin - minimumY) : 0;
+  if (yOffset) {
+    for (const element of elements) {
+      if (element.kind === "line") {
+        for (const segment of element.segments) {
+          segment.from[1] += yOffset;
+          segment.to[1] += yOffset;
+        }
+      } else element.y += yOffset;
+    }
+    top += yOffset;
+  }
   const plate = { width: Math.max(...elements.map((e) => bounds(e).maxX)) + A.margin,
     height: top + A.margin, thickness: p.baseThickness };
   if (plate.width > p.maxWidth || plate.height > p.maxHeight || elements.some((e) => bounds(e).minX < A.margin - 1e-7 || bounds(e).minY < A.margin - 1e-7)) {
-    fail("The chart labels and required clearances do not fit this plate. Shorten labels or simplify the source; braille cannot be scaled down.");
+    throw layoutDoesNotFit(plate, p);
   }
   const state: GeometryState = { version: 1, units: "mm", source: data, profile: p, plate,
     braille: { grade, table: translation!.table, version: translation!.version },
-    mapping: { independent: domain, dependent: [min, max], x, y, width, height, horizontal }, elements };
+    mapping: { independent: domain, dependent: [min, max], x, y: y + yOffset, width, height, horizontal }, elements };
   const issues = validateGeometry(state);
   if (issues.length) throw new GeometryError("GEOMETRY_VALIDATION_FAILED", `This layout does not satisfy the tactile profile: ${issues[0].message}`);
   return state;
+}
+
+function makeCategoryCodes(labels: string[]): { codes: string[]; entries: Array<{ code: string; label: string }> } {
+  const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+  const codeByLabel = new Map<string, string>();
+  const labelByCode = new Map<string, string>();
+  const entries: Array<{ code: string; label: string }> = [];
+  const codes = labels.map((label) => {
+    const existing = codeByLabel.get(label);
+    if (existing) return existing;
+    const normalized = label.normalize("NFKD").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const candidate = normalized.slice(0, 2).padEnd(2, "x");
+    let code = candidate;
+    if (labelByCode.has(code) && labelByCode.get(code) !== label) {
+      code = "";
+      for (let index = 0; index < alphabet.length ** 2; index += 1) {
+        const alternative = alphabet[Math.floor(index / alphabet.length)] + alphabet[index % alphabet.length];
+        if (!labelByCode.has(alternative) || labelByCode.get(alternative) === label) {
+          code = alternative;
+          break;
+        }
+      }
+      if (!code) fail("This chart has too many distinct labels to assign unique two-character legend codes.");
+    }
+    codeByLabel.set(label, code);
+    labelByCode.set(code, label);
+    entries.push({ code, label });
+    return code;
+  });
+  return { codes, entries };
 }
 
 function spanForTicks(ticks: Tick[], dimension: "width" | "height"): number {

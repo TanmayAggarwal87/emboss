@@ -17,6 +17,7 @@ import type {
   JobApiResponse,
   PersistedRegionItem,
 } from "@/lib/frontend-types"
+import { withApprovedRegion } from "@/lib/review/approval-state"
 
 const normalizeRegions = (data: JobApiResponse): PersistedRegionItem[] =>
   (data.pages || []).flatMap((page) => (page.regions || []).map((region) => ({
@@ -30,6 +31,8 @@ export default function Home() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [isRetrying, setIsRetrying] = useState(false)
+  const [approvingRegionId, setApprovingRegionId] = useState<string | null>(null)
+  const [approvalError, setApprovalError] = useState<string | null>(null)
   const [jobResponse, setJobResponse] = useState<JobApiResponse | null>(null)
   const [regions, setRegions] = useState<PersistedRegionItem[]>([])
   const [errorMessage, setErrorMessage] = useState<{
@@ -147,11 +150,23 @@ export default function Home() {
     setIsProcessing(false)
   }
 
-  const handleApproveRegion = (regionId: string) => {
-    setRegions((current) => current.map((region) => region.id === regionId
-      ? { ...region, review_status: "approved" }
-      : region))
-    setCurrentStep("export")
+  const handleApproveRegion = async (regionId: string) => {
+    if (!jobResponse?.job_id || approvingRegionId) return
+    setApprovingRegionId(regionId)
+    setApprovalError(null)
+    try {
+      const response = await fetch(`/api/jobs/${encodeURIComponent(jobResponse.job_id)}/regions/${encodeURIComponent(regionId)}/approve`, { method: "POST" })
+      const result = await response.json() as { region?: { id: string; review_status: "approved" }; error?: { message?: string } }
+      if (!response.ok || result.region?.review_status !== "approved") {
+        setApprovalError(result.error?.message || "This region could not be approved. Please try again.")
+        return
+      }
+      setRegions((current) => withApprovedRegion(current, result.region!.id))
+    } catch {
+      setApprovalError("Could not save this approval. Check your connection and try again.")
+    } finally {
+      setApprovingRegionId(null)
+    }
   }
 
   return (
@@ -243,12 +258,15 @@ export default function Home() {
         {currentStep === "review" && (
           <div className="space-y-5">
             <Button variant="outline" onClick={() => setCurrentStep("processing")}>Page processing details</Button>
-            <ReviewWorkspace regions={regions} onApprove={handleApproveRegion} />
+            {approvalError && <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{approvalError}</p>}
+            <ReviewWorkspace regions={regions} onApprove={handleApproveRegion} onExport={() => setCurrentStep("export")}
+              approvingRegionId={approvingRegionId} />
           </div>
         )}
 
         {currentStep === "export" && (
-          <ExportView fileName={selectedFile?.name ?? "accessible_document.pdf"} regions={regions} onReset={handleReset} />
+          <ExportView fileName={selectedFile?.name ?? "accessible_document.pdf"} regions={regions} onReset={handleReset}
+            onBack={() => setCurrentStep("review")} />
         )}
       </main>
 

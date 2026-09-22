@@ -10,6 +10,7 @@ import {
   Box,
   RotateCcw,
   Loader2,
+  ArrowLeft,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import JSZip from "jszip"
@@ -21,10 +22,12 @@ interface ExportViewProps {
   fileName: string
   regions: PersistedRegionItem[]
   onReset: () => void
+  onBack: () => void
 }
 
-export function ExportView({ fileName, regions, onReset }: ExportViewProps) {
+export function ExportView({ fileName, regions, onReset, onBack }: ExportViewProps) {
   const [isExporting, setIsExporting] = useState(false)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
 
   const approvedRegions = regions.filter((r) => r.review_status === "approved")
   const rejectedRegions = regions.filter((r) => r.review_status === "rejected")
@@ -120,6 +123,45 @@ Tactile STL files can be directly sliced in standard FDM slicers (PrusaSlicer, B
     }
   }
 
+  const handleDownloadRegion = async (region: PersistedRegionItem, index: number) => {
+    setDownloadError(null)
+    try {
+      let blob: Blob
+      let extension: "brf" | "stl"
+      if (region.type === "text" && region.extracted_data?.kind === "text" && region.extracted_data.status === "processed") {
+        blob = new Blob([region.extracted_data.braille], { type: "text/plain;charset=utf-8" })
+        extension = "brf"
+      } else if (region.type === "table" && region.extracted_data?.kind === "table" && region.extracted_data.status === "processed") {
+        blob = new Blob([region.extracted_data.braille_pages.join("\n\n---\n\n")], { type: "text/plain;charset=utf-8" })
+        extension = "brf"
+      } else if (region.type === "diagram" && region.geometry) {
+        const mesh = buildGeometryMesh(region.geometry)
+        try {
+          const output = new STLExporter().parse(mesh, { binary: true })
+          blob = new Blob([output.buffer as ArrayBuffer], { type: "model/stl" })
+        } finally {
+          disposeGeometryMesh(mesh)
+        }
+        extension = "stl"
+      } else {
+        setDownloadError("This approved region has no exportable file.")
+        return
+      }
+
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = `${fileName.replace(/\.pdf$/i, "")}_page_${region.page_number}_region_${index + 1}.${extension}`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error("Region export failed", error)
+      setDownloadError("This region could not be exported. Please try again.")
+    }
+  }
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       {/* Top Completion Header */}
@@ -131,7 +173,7 @@ Tactile STL files can be directly sliced in standard FDM slicers (PrusaSlicer, B
           Your accessible document is ready
         </h2>
         <p className="text-xs text-neutral-500 max-w-md mx-auto">
-          All regions have been reviewed. Approved content has been assembled into a standardized tactile and braille package.
+          Each approved region is available as an individual file, and you can also download them together as a package.
         </p>
       </div>
 
@@ -178,6 +220,19 @@ Tactile STL files can be directly sliced in standard FDM slicers (PrusaSlicer, B
           </div>
         </div>
 
+        {approvedRegions.length > 0 && <div className="space-y-2">
+          <h4 className="text-xs font-semibold text-neutral-700">Approved region files</h4>
+          <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-200">
+            {approvedRegions.map((region, index) => <li key={region.id} className="flex flex-wrap items-center justify-between gap-3 p-3">
+              <span className="text-xs text-neutral-700">Page {region.page_number} · Region {index + 1} · {region.type}</span>
+              <Button type="button" size="sm" variant="outline" onClick={() => void handleDownloadRegion(region, index)}>
+                <Download className="mr-1.5 size-3.5" /> Download file
+              </Button>
+            </li>)}
+          </ul>
+          {downloadError && <p role="alert" className="text-xs text-red-700">{downloadError}</p>}
+        </div>}
+
         {/* Download Action */}
         <div className="space-y-2 pt-2">
           <Button
@@ -219,7 +274,11 @@ Tactile STL files can be directly sliced in standard FDM slicers (PrusaSlicer, B
       </div>
 
       {/* Reset / New Document */}
-      <div className="text-center pt-2">
+      <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+        <Button type="button" variant="outline" size="sm" onClick={onBack} className="text-xs gap-1.5">
+          <ArrowLeft className="size-3.5" />
+          <span>Back to region review</span>
+        </Button>
         <Button
           type="button"
           variant="ghost"

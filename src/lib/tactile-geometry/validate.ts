@@ -131,15 +131,39 @@ export function validateGeometry(input: unknown): ValidationIssue[] {
   });
   const independentLabelAxis = m.horizontal ? "y" : "x";
   const dependentLabelAxis = m.horizontal ? "x" : "y";
-  const requireLabel = (labelId: string, text: string, axis: string, coordinate: number) => {
+  const legendLabels = state.elements.filter((element): element is Extract<GeometryElement, { kind: "label" }> =>
+    element.kind === "label" && element.id.startsWith("legend-key-"));
+  const legendCodeToLabel = new Map<string, string>();
+  const expectedLegendEntries = new Set<string>();
+  const categoricalValues = source.independent_axis.type === "categorical" ? source.independent_axis.values : [];
+  for (const [index, legend] of legendLabels.entries()) {
+    const match = /^([a-z0-9]{2}) (.+)$/.exec(legend.text);
+    if (legend.id !== `legend-key-${index}` || !match || !categoricalValues.includes(match[2])) {
+      add("integrity", "LEGEND_ENTRY", "Legend entries must use stable IDs, unique two-character codes and source category labels.", legend.id);
+      continue;
+    }
+    const existing = legendCodeToLabel.get(match[1]);
+    if ((existing && existing !== match[2]) || (existing === match[2])) {
+      add("integrity", "LEGEND_CODE", "A legend code must identify exactly one distinct source category.", legend.id);
+    }
+    legendCodeToLabel.set(match[1], match[2]);
+  }
+  const requireLabel = (labelId: string, text: string, axis: string, coordinate: number, allowLegendCode = false) => {
     const e = state.elements.find((candidate) => candidate.id === labelId);
-    if (!e || e.kind !== "label" || e.text !== text || e.anchor !== `${axis}-axis` ||
+    const textMatches = e?.kind === "label" && (e.text === text || (allowLegendCode && legendCodeToLabel.get(e.text) === text));
+    if (!e || e.kind !== "label" || !textMatches || e.anchor !== `${axis}-axis` ||
       !close(axis === "x" ? e.x + e.width / 2 : e.y + e.height / 2, coordinate)) {
       add("integrity", "AXIS_LABEL", "An axis label is missing, misaddressed or does not match its source value/position.", labelId);
+    } else if (allowLegendCode && e.text !== text) {
+      expectedLegendEntries.add(`${e.text} ${text}`);
     }
   };
   positions.forEach((position, i) => requireLabel(`label-${independentLabelAxis}-${i}`,
-    String(source.independent_axis.values[i]), independentLabelAxis, m.horizontal ? position[1] : position[0]));
+    String(source.independent_axis.values[i]), independentLabelAxis, m.horizontal ? position[1] : position[0],
+    source.independent_axis.type === "categorical"));
+  if (legendLabels.length !== expectedLegendEntries.size || legendLabels.some((legend) => !expectedLegendEntries.has(legend.text))) {
+    add("integrity", "LEGEND_MAPPING", "Every short category label must have exactly one matching full-label legend entry.");
+  }
   const tickValues = [...new Set([m.dependent[0], 0, m.dependent[1]])].sort((a, b) => a - b);
   tickValues.forEach((value, i) => {
     const fraction = (value - m.dependent[0]) / (m.dependent[1] - m.dependent[0]);

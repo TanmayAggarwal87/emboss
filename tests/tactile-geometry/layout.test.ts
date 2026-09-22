@@ -23,6 +23,37 @@ test("generates both supported fixture charts with stable source elements", () =
   }
 });
 
+test("uses deterministic unique short codes and a full Braille legend when categorical labels exceed the plate", () => {
+  const categories = ["CategoryAlphaLong", "CategoryAlpineLong"];
+  for (const chart of [bar, line]) {
+    const data = { ...chart,
+      independent_axis: { type: "categorical" as const, values: categories },
+      data_points: categories.map((label, index) => ({ label, value: index + 1 })) };
+    const state = generated(data);
+    const shortLabels = state.elements.filter((element): element is Extract<GeometryState["elements"][number], { kind: "label" }> =>
+      element.kind === "label" && /^label-x-\d+$/.test(element.id));
+    const legend = state.elements.filter((element): element is Extract<GeometryState["elements"][number], { kind: "label" }> =>
+      element.kind === "label" && element.id.startsWith("legend-key-"));
+
+    assert.deepEqual(state.source, data);
+    assert.equal(shortLabels.length, categories.length);
+    assert.equal(legend.length, categories.length);
+    assert.deepEqual(shortLabels.map((element) => element.text), ["ca", "aa"]);
+    assert.deepEqual(legend.map((element) => element.text), categories.map((category, index) => `${["ca", "aa"][index]} ${category}`));
+    assert.ok(state.plate.width <= profile.maxWidth && state.plate.height <= profile.maxHeight);
+  }
+});
+
+test("still rejects a chart whose full-label legend exceeds the configured plate", () => {
+  const categories = ["CategoryAlphaLongName", "CategoryAlpineLongName"];
+  const data = { ...bar,
+    independent_axis: { type: "categorical" as const, values: categories },
+    data_points: categories.map((label, index) => ({ label, value: index + 1 })) };
+  const result = new DeterministicGeometryProcessor(profile, 1).process(data);
+  assert.equal(result.status, "failed");
+  if (result.status === "failed") assert.match(result.error.message, /even with short labels and a Braille legend[\s\S]*Required .* configured maximum/);
+});
+
 test("horizontal bars preserve descending numeric source order and proportional placement", () => {
   const data = { ...bar, orientation: "horizontal" as const,
     independent_axis: { type: "numeric" as const, values: [10, 4, -2] },

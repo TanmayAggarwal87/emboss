@@ -10,12 +10,14 @@ test("blank environment defaults to the approved portable FDM profile without ch
   assert.equal(ACCESSIBILITY.plottedPointMin, 3);
   const custom = getPhysicalProfile({ MAX_PLATE_WIDTH_MM: "150", MAX_PLATE_HEIGHT_MM: "160", TACTILE_PLATE_THICKNESS_MM: "3" });
   assert.deepEqual([custom.maxWidth, custom.maxHeight, custom.baseThickness], [150, 160, 3]);
+  const expanded = getPhysicalProfile({ MAX_PLATE_WIDTH_MM: "292", MAX_PLATE_HEIGHT_MM: "279" });
+  assert.deepEqual([expanded.maxWidth, expanded.maxHeight], [292, 279]);
 });
 
 test("invalid profiles cannot disable printable minima or invert tactile hierarchy", () => {
   for (const change of [{ gridWidth: 0.1 }, { axisRise: 2 }, { stripePitch: 1 }, { gridGap: 1 },
-    { minFeatureWidth: 0.01 }, { minFeatureRise: 0.01 }, { baseThickness: 0.1 }, { maxHeight: 181 }]) {
+    { minFeatureWidth: 0.01 }, { minFeatureRise: 0.01 }, { baseThickness: 0.1 }, { maxHeight: 0 }]) {
     assert.equal(profileSchema.safeParse({ ...DEFAULT_PROFILE, ...change }).success, false);
   }
-  for (const value of ["NaN", "Infinity", "0", "-1", "181"]) assert.throws(() => getPhysicalProfile({ MAX_PLATE_WIDTH_MM: value }));
+  for (const value of ["NaN", "Infinity", "0", "-1"]) assert.throws(() => getPhysicalProfile({ MAX_PLATE_WIDTH_MM: value }));
 });
