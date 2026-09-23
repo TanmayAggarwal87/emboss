@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createRegionApprovalHandler } from "../../src/lib/review/approval-handler.ts";
-import { countApprovedRegions, withApprovedRegion } from "../../src/lib/review/approval-state.ts";
+import { createRegionApprovalHandler, createRegionRejectionHandler } from "../../src/lib/review/approval-handler.ts";
 import { UploadError } from "../../src/lib/document-processing/errors.ts";
-import type { PersistedRegionItem } from "../../src/lib/frontend-types.ts";
 
 const jobId = "00000000-0000-4000-8000-000000000001";
 const regionId = "00000000-0000-4000-8000-000000000002";
@@ -41,12 +39,14 @@ test("returns clear not-found and not-approvable errors", async () => {
   }
 });
 
-test("approving one region preserves the rest of the review list for individual decisions", () => {
-  const regions = [regionId, "00000000-0000-4000-8000-000000000003"].map((id): PersistedRegionItem => ({
-    id, job_id: jobId, page_number: 1, type: "text", bounding_box: { x: 0, y: 0, width: 1, height: 1 },
-    review_status: "pending", extracted_data: null,
-  }));
-  const updated = withApprovedRegion(regions, regionId);
-  assert.deepEqual(updated.map((region) => region.review_status), ["approved", "pending"]);
-  assert.equal(countApprovedRegions(updated), 1);
+test("rejects one region independently and returns its persisted status", async () => {
+  const calls: string[][] = [];
+  const handler = createRegionRejectionHandler(async (job, region) => {
+    calls.push([job, region]);
+    return { id: region, review_status: "rejected" };
+  });
+  const response = await handler(new Request(`${base}/api/jobs/${jobId}/regions/${regionId}/reject`, { method: "POST" }), jobId, regionId);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { region: { id: regionId, review_status: "rejected" } });
+  assert.deepEqual(calls, [[jobId, regionId]]);
 });

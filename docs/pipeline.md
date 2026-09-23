@@ -255,9 +255,12 @@ The client preview renders:
   explicit alert banner. WebGL context loss or absence surfaces a clear, actionable message.
 - Region approval is persisted independently. Approving a region keeps the reviewer in
   the review workspace so other regions can be reviewed and approved separately.
+- Region exclusion is also persisted independently; excluded regions are omitted from
+  exports and do not prevent other regions from being approved.
 - Export is available once at least one region is approved. Each approved region can be
   downloaded individually or included with the other approved files in one ZIP package.
-- Edit-prompt and reject actions remain outside the active review flow.
+- Edit-prompt remains limited to the supported operations in the versioned Call C
+  contract; unsupported changes must be surfaced without mutating geometry.
 
 ## Stage 5 — Human review
 
@@ -269,10 +272,15 @@ The client preview renders:
 
 ## Stage 5a — Edit-prompt
 
-- Input: plain-English instruction + current geometry state (with element IDs)
-- The edit agent may only emit schema-checked operations against real elements
-  (move/resize/relabel by ID) — never raw geometry, never a full regeneration.
-  See AGENTS.md §8.
+- Input: plain-English instruction plus only editable axis/series title IDs and
+  their current text; physical coordinates and other geometry are not sent to Gemini.
+- Call Type C may relabel `label-x-title`, `label-y-title`, or `legend-0` only.
+  Changing data/category/tick labels, moving, resizing, deleting, or creating
+  elements is unsupported. Replacement wording must occur verbatim in the human
+  instruction.
+- Deterministic code translates the replacement with liblouis, recomputes its fixed
+  braille footprint, and reruns the full Phase 5 validator before saving it as
+  pending review. The original extracted source data is never changed.
 - After an edit operation is applied, the result must be re-run through the full
   Stage 3c Step 4 validation before returning to Stage 4 preview. An edited design is
   never treated as pre-validated just because a human requested the change.

@@ -4,6 +4,10 @@ export function withApprovedRegion(regions: PersistedRegionItem[], regionId: str
   return regions.map((region) => region.id === regionId ? { ...region, review_status: "approved" } : region);
 }
 
-export function countApprovedRegions(regions: PersistedRegionItem[]): number {
-  return regions.filter((region) => region.review_status === "approved").length;
+export function withRejectedRegion(regions: PersistedRegionItem[], regionId: string): PersistedRegionItem[] {
+  return regions.map((region) => region.id === regionId ? { ...region, review_status: "rejected" } : region);
+}
+
+export function withEditedRegion(regions: PersistedRegionItem[], updated: { id: string; geometry: PersistedRegionItem["geometry"]; review_status: "pending" }): PersistedRegionItem[] {
+  return regions.map((region) => region.id === updated.id ? { ...region, geometry: updated.geometry, review_status: "pending" } : region);
 }

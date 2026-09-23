@@ -12,21 +12,27 @@ import { Badge } from "@/components/ui/badge"
 import type { PersistedRegionItem } from "@/lib/frontend-types"
 import { validateGeometry } from "@/lib/tactile-geometry/validate"
 import { Button } from "@/components/ui/button"
-import { Check } from "lucide-react"
+import { Check, X } from "lucide-react"
+import { EditRequestDialog } from "./EditRequestDialog"
 
 const Tactile3DViewer = dynamic(
   () => import("./Tactile3DViewer").then((module) => module.Tactile3DViewer),
   { ssr: false, loading: () => <p role="status" className="p-6 text-sm">Loading tactile preview…</p> }
 )
 
-export function ReviewWorkspace({ regions, onApprove, onExport, approvingRegionId }: {
+export function ReviewWorkspace({ regions, onApprove, onReject, onEdit, onExport, approvingRegionId, rejectingRegionId, editingRegionId }: {
   regions: PersistedRegionItem[];
   onApprove: (regionId: string) => void;
+  onReject: (regionId: string) => void;
+  onEdit: (regionId: string, instruction: string) => Promise<boolean>;
   onExport: () => void;
   approvingRegionId: string | null;
+  rejectingRegionId: string | null;
+  editingRegionId: string | null;
 }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isOutlineOpen, setIsOutlineOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
   const index = Math.min(currentIndex, Math.max(0, regions.length - 1))
   const region = regions[index]
   const geometry = region?.geometry
@@ -47,7 +53,7 @@ export function ReviewWorkspace({ regions, onApprove, onExport, approvingRegionI
       <div className="border-b border-neutral-200 pb-4">
         <p className="text-sm text-neutral-600">Document / Page {region.page_number} / Region {index + 1}</p>
         <h2 className="mt-1 text-xl font-semibold">Preview generated output</h2>
-        <p className="mt-1 text-sm text-neutral-600">Compare the original source with the generated output. Approve regions one at a time; you can export all approved regions when you are ready.</p>
+        <p className="mt-1 text-sm text-neutral-600">Compare the original source with the generated output. Approve or exclude each region independently, then export approved regions when you are ready.</p>
       </div>
       <RegionNavigator currentIndex={index} totalRegions={regions.length} currentRegion={region}
         onPrevious={() => setCurrentIndex(Math.max(0, index - 1))}
@@ -85,15 +91,24 @@ export function ReviewWorkspace({ regions, onApprove, onExport, approvingRegionI
           {regions.filter((item) => item.review_status === "approved").length} of {regions.length} regions approved
         </p>
         <div className="flex flex-wrap gap-2">
+          {hasGeometry && <Button type="button" variant="outline" disabled={approvingRegionId !== null || rejectingRegionId !== null || editingRegionId !== null}
+            onClick={() => setIsEditOpen(true)}>Request title edit</Button>}
           {regions.some((item) => item.review_status === "approved") &&
             <Button type="button" variant="outline" onClick={onExport}>Export approved regions</Button>}
-          <Button type="button" disabled={!canApprove || region.review_status === "approved" || approvingRegionId !== null}
+          <Button type="button" variant="outline" disabled={region.review_status === "rejected" || approvingRegionId !== null || rejectingRegionId !== null}
+            onClick={() => onReject(region.id)}>
+            <X className="mr-2 size-4" />
+            {rejectingRegionId === region.id ? "Saving exclusion…" : region.review_status === "rejected" ? "Region excluded" : "Exclude region"}
+          </Button>
+          <Button type="button" disabled={!canApprove || region.review_status === "approved" || approvingRegionId !== null || rejectingRegionId !== null}
             onClick={() => onApprove(region.id)}>
             <Check className="mr-2 size-4" />
             {approvingRegionId === region.id ? "Saving approval…" : region.review_status === "approved" ? "Region approved" : "Approve region"}
           </Button>
         </div>
       </div>
+      <EditRequestDialog open={isEditOpen} onOpenChange={setIsEditOpen} region={region}
+        onApplyEdit={(instruction) => onEdit(region.id, instruction)} />
     </div>
   )
 }

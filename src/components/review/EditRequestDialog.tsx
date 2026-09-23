@@ -61,7 +61,7 @@ export function EditRequestDialog({
       } else {
         setStatusMessage({
           type: "error",
-          text: "The requested adjustment violates BANA 2022 minimum clearance standards (≥2.5mm) or refers to an unsupported attribute.",
+          text: "This request could not be applied. Only axis and series titles can be relabeled, and the updated diagram must pass deterministic validation.",
         })
       }
     } catch {
@@ -85,7 +85,7 @@ export function EditRequestDialog({
             <DialogTitle>Request a correction</DialogTitle>
           </div>
           <DialogDescription>
-            Describe what should change in this tactile graphic. Code will revalidate all tactile minimums.
+            Relabel an axis title or series title only. Chart data and tactile geometry cannot be edited here.
           </DialogDescription>
         </DialogHeader>
 
@@ -94,7 +94,7 @@ export function EditRequestDialog({
             <Textarea
               value={instruction}
               onChange={(e) => setInstruction(e.target.value)}
-              placeholder="For example: increase the spacing between bars, or adjust the y-axis label position."
+              placeholder="For example: Change the x-axis title to Calendar month."
               disabled={isSubmitting}
               className="h-28 text-xs resize-none"
               required

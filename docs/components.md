@@ -57,7 +57,7 @@ component, not a file listing.
 
 | Component | Path | Purpose | Key Props / Variants | Reusable Contexts |
 |---|---|---|---|---|
-| `ReviewWorkspace` | `src/components/review/ReviewWorkspace.tsx` | Top-level review screen with per-region approval, document outline, side-by-side inspection, and export navigation | `regions`, `onApprove`, `onExport`, `approvingRegionId` | Review screen |
+| `ReviewWorkspace` | `src/components/review/ReviewWorkspace.tsx` | Top-level review screen with per-region approval, title-edit request, exclusion, document outline, side-by-side inspection, and export navigation | `regions`, `onApprove`, `onEdit`, `onReject`, `onExport`, action region IDs | Review screen |
 | `DocumentOutline` | `src/components/review/DocumentOutline.tsx` | Sidebar outline of all pages and detected regions with type icons and status badges | `regions: RegionSummary[]`, `selectedId: string`, `onSelect: (id) => void` | Review workspace sidebar |
 | `RegionNavigator` | `src/components/review/RegionNavigator.tsx` | Previous/Next region navigation bar with counter, type badge, and jump controls | `currentIndex: number`, `totalCount: number`, `onPrev: () => void`, `onNext: () => void` | Review workspace header/footer |
 | `SourcePreview` | `src/components/review/SourcePreview.tsx` | Left pane displaying original high-res MuPDF source image crop with zoom/pan and 410 fallback | `cropUrl: string`, `altText: string`, `bbox?: BoundingBox` | Review split-screen |
@@ -65,8 +65,8 @@ component, not a file listing.
 | `ValidationSummary` | `src/components/review/ValidationSummary.tsx` | Collapsible panel showing deterministic BANA metrics (dimensions, rise, separation, dot pitch) | `validation: BANAValidationResult` | Review inspector |
 | `BraillePreview` | `src/components/review/BraillePreview.tsx` | Sighted-accessible braille viewer showing dot representations alongside back-translated plain text | `brailleAscii: string`, `plainText: string` | Text/table region review |
 | `TablePreview` | `src/components/review/TablePreview.tsx` | Structured braille table inspector showing columns, guide dots, and header separation | `tableData: BrailleTableResult` | Table region review |
-| `ReviewActions` | `src/components/review/ReviewActions.tsx` | Reusable action bar with approve/edit/reject callbacks; the active review workspace currently wires per-region approval and export, while edit/reject remain inactive | `currentStatus`, `onApprove`, `onReject`, `onRequestEdit` | Review workspace action bar |
-| `EditRequestDialog` | `src/components/review/EditRequestDialog.tsx` | Modal dialog for sighted reviewers to enter plain-English tactile edit requests (Phase 7 ready) | `isOpen: boolean`, `onClose: () => void`, `onSubmit: (prompt: string) => void` | Review workspace |
+| `ReviewActions` | `src/components/review/ReviewActions.tsx` | Reusable action bar with approve/edit/reject callbacks; the current review workspace wires region actions directly | `currentStatus`, `onApprove`, `onReject`, `onRequestEdit` | Review action patterns |
+| `EditRequestDialog` | `src/components/review/EditRequestDialog.tsx` | Modal for plain-English axis/series title relabel requests; other edits are unsupported | `open`, `onOpenChange`, `region`, `onApplyEdit` | Review workspace |
 
 ### Export Stage
 

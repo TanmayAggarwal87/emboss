@@ -17,7 +17,7 @@ import type {
   JobApiResponse,
   PersistedRegionItem,
 } from "@/lib/frontend-types"
-import { withApprovedRegion } from "@/lib/review/approval-state"
+import { withApprovedRegion, withEditedRegion, withRejectedRegion } from "@/lib/review/approval-state"
 
 const normalizeRegions = (data: JobApiResponse): PersistedRegionItem[] =>
   (data.pages || []).flatMap((page) => (page.regions || []).map((region) => ({
@@ -32,6 +32,8 @@ export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [isRetrying, setIsRetrying] = useState(false)
   const [approvingRegionId, setApprovingRegionId] = useState<string | null>(null)
+  const [rejectingRegionId, setRejectingRegionId] = useState<string | null>(null)
+  const [editingRegionId, setEditingRegionId] = useState<string | null>(null)
   const [approvalError, setApprovalError] = useState<string | null>(null)
   const [jobResponse, setJobResponse] = useState<JobApiResponse | null>(null)
   const [regions, setRegions] = useState<PersistedRegionItem[]>([])
@@ -151,7 +153,7 @@ export default function Home() {
   }
 
   const handleApproveRegion = async (regionId: string) => {
-    if (!jobResponse?.job_id || approvingRegionId) return
+    if (!jobResponse?.job_id || approvingRegionId || rejectingRegionId) return
     setApprovingRegionId(regionId)
     setApprovalError(null)
     try {
@@ -167,6 +169,46 @@ export default function Home() {
     } finally {
       setApprovingRegionId(null)
     }
+  }
+
+  const handleRejectRegion = async (regionId: string) => {
+    if (!jobResponse?.job_id || approvingRegionId || rejectingRegionId) return
+    setRejectingRegionId(regionId)
+    setApprovalError(null)
+    try {
+      const response = await fetch(`/api/jobs/${encodeURIComponent(jobResponse.job_id)}/regions/${encodeURIComponent(regionId)}/reject`, { method: "POST" })
+      const result = await response.json() as { region?: { id: string; review_status: "rejected" }; error?: { message?: string } }
+      if (!response.ok || result.region?.review_status !== "rejected") {
+        setApprovalError(result.error?.message || "This region could not be excluded. Please try again.")
+        return
+      }
+      setRegions((current) => withRejectedRegion(current, result.region!.id))
+    } catch {
+      setApprovalError("Could not save this exclusion. Check your connection and try again.")
+    } finally {
+      setRejectingRegionId(null)
+    }
+  }
+
+  const handleEditRegion = async (regionId: string, instruction: string): Promise<boolean> => {
+    if (!jobResponse?.job_id || approvingRegionId || rejectingRegionId || editingRegionId) return false
+    setEditingRegionId(regionId)
+    setApprovalError(null)
+    try {
+      const response = await fetch(`/api/jobs/${encodeURIComponent(jobResponse.job_id)}/regions/${encodeURIComponent(regionId)}/edit`, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ instruction }),
+      })
+      const result = await response.json() as { region?: { id: string; geometry: PersistedRegionItem["geometry"]; review_status: "pending" }; error?: { message?: string } }
+      if (!response.ok || result.region?.review_status !== "pending" || !result.region.geometry) {
+        setApprovalError(result.error?.message || "This edit could not be applied; the saved geometry remains available.")
+        return false
+      }
+      setRegions((current) => withEditedRegion(current, result.region!))
+      return true
+    } catch {
+      setApprovalError("Could not apply this edit. The saved geometry remains available.")
+      return false
+    } finally { setEditingRegionId(null) }
   }
 
   return (
@@ -260,7 +302,8 @@ export default function Home() {
             <Button variant="outline" onClick={() => setCurrentStep("processing")}>Page processing details</Button>
             {approvalError && <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{approvalError}</p>}
             <ReviewWorkspace regions={regions} onApprove={handleApproveRegion} onExport={() => setCurrentStep("export")}
-              approvingRegionId={approvingRegionId} />
+              onReject={handleRejectRegion} onEdit={handleEditRegion} approvingRegionId={approvingRegionId} rejectingRegionId={rejectingRegionId}
+              editingRegionId={editingRegionId} />
           </div>
         )}
 

@@ -228,14 +228,13 @@ Phases 7 and 8.
 
 Goal: Stage 5 and 5a from `docs/pipeline.md`.
 
-- [ ] Review actions per region: approve / edit-prompt / reject, updating
+- [x] Review actions per region: approve / edit-prompt / reject, updating
       `regions.review_status`
-- [ ] Edit-prompt input: plain-English instruction + current geometry state (with
-      element IDs) sent to the edit agent
-- [ ] Edit agent constrained to schema-checked operations against real elements only
-      (move/resize/relabel by ID) — verify it cannot emit raw geometry or a full
-      regeneration (`AGENTS.md` §8)
-- [ ] Every edit result re-runs the full Phase 5 validator before returning to
+- [x] Edit-prompt input: plain-English instruction + editable title IDs/current text
+      sent to the edit agent; physical coordinates and non-title geometry are excluded
+- [x] Edit agent constrained to schema-checked title relabeling only; unsupported
+      operations cannot emit raw geometry or regenerate a chart (`AGENTS.md` §8)
+- [x] Every edit result re-runs the full Phase 5 validator before returning to
       preview — confirm this actually happens, don't trust an edit as pre-validated
 - [ ] (Optional) log edits to the `edits` table if you added it in Phase 0
 

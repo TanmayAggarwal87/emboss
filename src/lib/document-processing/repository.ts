@@ -10,8 +10,46 @@ import type {
   JobRepository,
   PersistedRegion,
 } from "./types.ts";
+import type { GeometryState } from "../tactile-geometry/types.ts";
 
 export class SupabaseJobRepository implements JobRepository {
+  async loadEditableRegion(jobId: string, regionId: string): Promise<{ id: string; type: string; extracted_data: unknown; geometry: unknown }> {
+    const { data, error } = await getSupabaseAdmin().from("regions")
+      .select("id, type, extracted_data, geometry").eq("job_id", jobId).eq("id", regionId).maybeSingle();
+    if (error) throw new UploadError(503, "DATABASE_ERROR", "The region could not be loaded for editing.");
+    if (!data) throw new UploadError(404, "REGION_NOT_FOUND", "This region could not be found in the document.");
+    if (data.type !== "diagram" || !data.geometry || validateGeometry(data.geometry).length) {
+      throw new UploadError(422, "REGION_NOT_EDITABLE", "Only diagrams with validated tactile geometry can be edited.");
+    }
+    return data;
+  }
+
+  async markRegionEditRequested(jobId: string, regionId: string): Promise<void> {
+    const { data, error } = await getSupabaseAdmin().from("regions").update({ review_status: "edit_requested" })
+      .eq("job_id", jobId).eq("id", regionId).select("id").maybeSingle();
+    if (error) throw new UploadError(503, "DATABASE_ERROR", "The edit request could not be recorded.");
+    if (!data) throw new UploadError(404, "REGION_NOT_FOUND", "This region could not be found in the document.");
+  }
+
+  async saveEditedGeometry(jobId: string, regionId: string, geometry: GeometryState): Promise<{ id: string; review_status: "pending"; geometry: GeometryState }> {
+    if (validateGeometry(geometry).length) throw new UploadError(422, "GEOMETRY_INVALID", "Invalid geometry was blocked before persistence.");
+    const { data, error } = await getSupabaseAdmin().from("regions").update({ geometry: JSON.parse(JSON.stringify(geometry)), review_status: "pending" })
+      .eq("job_id", jobId).eq("id", regionId).select("id, geometry, review_status").maybeSingle();
+    if (error) throw new UploadError(503, "DATABASE_ERROR", "The validated edit could not be saved. The prior geometry remains available.");
+    if (!data) throw new UploadError(404, "REGION_NOT_FOUND", "This region could not be found in the document.");
+    return { id: data.id, review_status: "pending", geometry: data.geometry as unknown as GeometryState };
+  }
+
+  async rejectRegion(jobId: string, regionId: string): Promise<{ id: string; review_status: "rejected" }> {
+    const { data, error } = await getSupabaseAdmin().from("regions")
+      .update({ review_status: "rejected" })
+      .eq("job_id", jobId).eq("id", regionId)
+      .select("id, review_status").maybeSingle();
+    if (error) throw new UploadError(503, "DATABASE_ERROR", "The region exclusion could not be saved. Please try again.");
+    if (!data) throw new UploadError(404, "REGION_NOT_FOUND", "This region could not be found in the document.");
+    return { id: data.id, review_status: "rejected" };
+  }
+
   async approveRegion(jobId: string, regionId: string): Promise<{ id: string; review_status: "approved" }> {
     const supabase = getSupabaseAdmin();
     const { data: region, error: readError } = await supabase.from("regions")
