@@ -14,8 +14,8 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import JSZip from "jszip"
-import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js"
 import { buildGeometryMesh, disposeGeometryMesh } from "@/lib/tactile-geometry/mesh"
+import { serializeStl } from "@/lib/export/stl"
 import type { PersistedRegionItem } from "@/lib/frontend-types"
 
 interface ExportViewProps {
@@ -47,7 +47,6 @@ export function ExportView({ fileName, regions, onReset, onBack }: ExportViewPro
     setIsExporting(true)
     try {
       const zip = new JSZip()
-      const exporter = new STLExporter()
       const baseName = fileName.replace(/\.pdf$/i, "")
 
       // 1. Text Regions Braille Files
@@ -80,8 +79,8 @@ export function ExportView({ fileName, regions, onReset, onBack }: ExportViewPro
         if (r.type === "diagram" && r.geometry) {
           const meshGroup = buildGeometryMesh(r.geometry)
           try {
-            const stlOutput = exporter.parse(meshGroup, { binary: true })
-            zip.file(`tactile_graphic_page_${r.page_number}_diagram_${i + 1}.stl`, stlOutput.buffer)
+            const stlOutput = serializeStl(meshGroup)
+            zip.file(`tactile_graphic_page_${r.page_number}_diagram_${i + 1}.stl`, stlOutput)
           } finally {
             disposeGeometryMesh(meshGroup)
           }
@@ -137,8 +136,8 @@ Tactile STL files can be directly sliced in standard FDM slicers (PrusaSlicer, B
       } else if (region.type === "diagram" && region.geometry) {
         const mesh = buildGeometryMesh(region.geometry)
         try {
-          const output = new STLExporter().parse(mesh, { binary: true })
-          blob = new Blob([output.buffer as ArrayBuffer], { type: "model/stl" })
+          const output = serializeStl(mesh)
+          blob = new Blob([output], { type: "model/stl" })
         } finally {
           disposeGeometryMesh(mesh)
         }
