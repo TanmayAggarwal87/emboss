@@ -24,7 +24,7 @@ export function createRegionEditService(repository: RegionRepository, agent: Edi
       throw new UploadError(422, "REGION_NOT_EDITABLE", "Only diagrams with matching, validated source data can be edited.");
     }
     await repository.markRegionEditRequested(jobId, regionId);
-    const operation = await agent.propose(geometryResult, instruction);
+    const operation = await agent.propose(geometryResult, instruction, jobId);
     const edited = applyValidatedEdit(geometryResult, operation, instruction);
     return { region: await repository.saveEditedGeometry(jobId, regionId, edited) };
   };

@@ -304,9 +304,9 @@ The client preview renders:
 
 ## Cost/token discipline (ties to AGENTS.md §4)
 
-The only two points in this entire pipeline that should ever call Gemini are Stage 2
-(classification, fixed cost per page regardless of text density) and Stage 3c Step 2
-(diagram data extraction, cost proportional to diagram content only). If you find a
-Gemini call anywhere else in the pipeline — reading plain text, reading a real text
-table, computing geometry, deciding spacing — that call should not exist. Route that
-work to MuPDF, liblouis, or deterministic code instead.
+The only automatic Gemini calls while processing an uploaded document are Stage 2
+(classification, one page image per call) and Stage 3c Step 2 (structured extraction
+of a diagram crop). Stage 5a has a separate, optional Call C only when a human asks
+to relabel an eligible title. No Gemini call belongs in plain-text or real-table
+extraction, braille translation, geometry generation, physical validation, preview,
+or export. Route those operations to MuPDF, liblouis, or deterministic code instead.

@@ -52,9 +52,9 @@ test("Call B sends one crop, canonical config, pinned model and bounded transpor
     assert.deepEqual(request.config?.httpOptions, { timeout: 60_000, retryOptions: { attempts: 1 } });
     return response(JSON.stringify(EXPECTED_CHARTS[0]));
   });
-  assert.deepEqual(await extractor.extract(png, 3), EXPECTED_CHARTS[0]);
+  assert.deepEqual(await extractor.extract(png, 3, "test-job"), EXPECTED_CHARTS[0]);
   assert.equal(calls, 1);
-  assert.deepEqual(JSON.parse(logs[0]), { event: "gemini_token_usage", callType: "diagram_extraction", attempt: 1,
+  assert.deepEqual(JSON.parse(logs[0]), { event: "gemini_token_usage", callType: "diagram_extraction", jobId: "test-job", model: "fixture-model", attempt: 1,
     promptTokens: null, outputTokens: null, totalTokens: 12 });
 });
 

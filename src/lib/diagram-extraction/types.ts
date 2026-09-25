@@ -14,10 +14,10 @@ export type DiagramRegionResult =
   | { kind: "diagram"; status: "failed"; error: { code: string; message: string } };
 
 export interface DiagramExtractor {
-  extract(png: Uint8Array, maxAttempts: number): Promise<DiagramData>;
+  extract(png: Uint8Array, maxAttempts: number, jobId?: string): Promise<DiagramData>;
 }
 
 export interface DiagramProcessor {
   process(document: PdfDocumentHandle, pageIndex: number, box: BoundingBox,
-    maxAttempts: number): Promise<DiagramRegionResult>;
+    maxAttempts: number, jobId?: string): Promise<DiagramRegionResult>;
 }

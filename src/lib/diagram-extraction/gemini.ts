@@ -51,7 +51,7 @@ export class GeminiDiagramExtractor implements DiagramExtractor {
   // Injecting the transport allows quota-free tests of the actual API configuration.
   constructor(private readonly generate?: Generate) {}
 
-  async extract(png: Uint8Array, maxAttempts: number) {
+  async extract(png: Uint8Array, maxAttempts: number, jobId?: string) {
     const { apiKey, model } = getGeminiConfig();
     const client = this.generate ? undefined : new GoogleGenAI({ apiKey });
     const generate = this.generate ?? ((request) => client!.models.generateContent(request));
@@ -83,7 +83,7 @@ export class GeminiDiagramExtractor implements DiagramExtractor {
             : "The diagram analysis service is unavailable or timed out. Please wait a few minutes before trying again.",
         );
       }
-      console.info(JSON.stringify({ event: "gemini_token_usage", callType: "diagram_extraction", attempt,
+      console.info(JSON.stringify({ event: "gemini_token_usage", callType: "diagram_extraction", jobId: jobId ?? null, model, attempt,
         promptTokens: response.usageMetadata?.promptTokenCount ?? null,
         outputTokens: response.usageMetadata?.candidatesTokenCount ?? null,
         totalTokens: response.usageMetadata?.totalTokenCount ?? null }));

@@ -91,9 +91,15 @@ this verifies recovery mechanics, not provider uptime or perception consistency.
 
 ## Cost/token scope
 
-- Log Gemini token usage per call during testing (see AGENTS.md §4 for which two call
-  types exist) — this is cheap to add now and gives real per-document cost data
-  before any decision about scaling past 3 pages.
+- Log Gemini token usage per call during testing. Upload processing uses Call A
+  (one page classification) and Call B (one diagram crop); an optional human title
+  edit uses Call C from Stage 5a. Structured `gemini_token_usage` logs include the
+  job ID, configured model, call type, attempt, and available input/output/total
+  token counts, but never the PDF, prompt, extracted text, or API key. Group logs
+  by job ID to measure a document's usage, including any edit requests. Convert
+  tokens to a cost estimate using the provider's rate for that model and billing
+  tier at the time of the test; do not claim an exact billed amount from token
+  metadata alone. Failed provider requests may have no usage metadata.
 - Watch specifically for any Gemini call creeping into a stage that should be
   MuPDF/liblouis/deterministic-only (see `docs/pipeline.md`, "Cost/token discipline"
   section) — this is the most likely place scope quietly expands token cost without

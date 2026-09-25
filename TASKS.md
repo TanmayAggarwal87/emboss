@@ -271,18 +271,34 @@ Goal: confirm the "done" bar in `docs/testing-scope.md` is actually met.
 
 - [x] Run a full 1-3 page test PDF (text + one diagram + one table) through the
       entire pipeline with no manual DB/backend intervention
-- [ ] logging is in place for both Gemini call types (per
-      `docs/testing-scope.md`, "Cost/token scope") and note actual per-document cost
-- [ ] Confirm no Gemini call exists anywhere outside Stage 2 classification and
-      Stage 3c diagram data Confirm token usage extraction (`docs/pipeline.md`, "Cost/token discipline")
+- [x] Log token usage for Call A and Call B, and optional title-edit Call C, with
+      job ID/model attribution and no document content (`docs/testing-scope.md`,
+      "Cost/token scope")
+- [x] Record per-document usage and cost for the reviewer-tested three-page PDF:
+      12,427 input + 2,053 output = 14,480 measured tokens across six successful
+      Call A/B responses. The reviewer confirmed use of the free tier, so the
+      estimated Gemini API charge for this run is $0; this is not an invoice audit.
+      Two HTTP 503 attempts have no usage metadata. The local configured model is
+      `gemini-3.6-flash`; future runs log their own model/job ID explicitly.
+- [x] Confirm the only Gemini call sites are Stage 2 classification, Stage 3c
+      diagram extraction, and the human-triggered Stage 5a title-edit interpreter;
+      no Gemini call is in text/table extraction, geometry, preview, or export
 - [x] Run at least one intentionally out-of-scope input through the pipeline (e.g. an
       unsupported diagram type, an oversized table, a >3-page PDF) and confirm each
       fails with a clear, specific message rather than a crash or silent bad output
-- [ ] Re-check `docs/testing-scope.md` "Explicitly not in v1 testing scope" — confirm
-      none of those were accidentally built
+- [x] Re-check `docs/testing-scope.md` "Explicitly not in v1 testing scope" — no
+      auth, persistent history UI, file bucket, multi-document/batch flow, or
+      unsupported diagram/table geometry was found in the application paths
 
 **Phase 9 is done when:** the "What done looks like for v1 testing" section in
 `docs/testing-scope.md` is true for a real test document, verified in one sitting.
+
+Verified 2026-09-25: the reviewer confirmed the real document input/output and
+upload/Gemini behavior. The remaining cost, call-site, and v1 exclusion checks
+above were audited without sending new Gemini requests. Free-tier cost is an
+estimate from the reviewer-provided token log and tier confirmation, not a paid
+billing record. Physical print/slicer and expert tactile-reader certification
+remain outside this software QA claim.
 
 ---
 

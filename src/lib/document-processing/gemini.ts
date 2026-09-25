@@ -49,6 +49,7 @@ export class GeminiRegionClassifier implements RegionClassifier {
     page: RasterizedPage,
     maxValidationAttempts: number,
     signal?: AbortSignal,
+    jobId?: string,
   ): Promise<ClassifiedRegion[]> {
     const { apiKey, model } = getGeminiConfig();
     const client = this.options.generate ? undefined : new GoogleGenAI({ apiKey });
@@ -99,7 +100,7 @@ export class GeminiRegionClassifier implements RegionClassifier {
         return {
           text: response.text ?? "",
           onAttempt: () =>
-            logTokenUsage(page.pageNumber, attempt, response.usageMetadata),
+            logTokenUsage(page.pageNumber, attempt, model, jobId, response.usageMetadata),
         };
       },
       page.width,
@@ -112,6 +113,8 @@ export class GeminiRegionClassifier implements RegionClassifier {
 function logTokenUsage(
   pageNumber: number,
   attempt: number,
+  model: string,
+  jobId: string | undefined,
   usage:
     | {
         promptTokenCount?: number;
@@ -124,6 +127,8 @@ function logTokenUsage(
     JSON.stringify({
       event: "gemini_token_usage",
       callType: "region_classification",
+      jobId: jobId ?? null,
+      model,
       pageNumber,
       attempt,
       promptTokens: usage?.promptTokenCount ?? null,

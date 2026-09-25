@@ -13,12 +13,12 @@ const responseSchema: Schema = { anyOf: [
 ] };
 
 type Generate = (request: GenerateContentParameters) => Promise<GenerateContentResponse>;
-export type EditAgent = { propose(state: GeometryState, instruction: string): Promise<EditOperation> };
+export type EditAgent = { propose(state: GeometryState, instruction: string, jobId?: string): Promise<EditOperation> };
 
 export class GeminiEditAgent implements EditAgent {
   constructor(private readonly generate?: Generate) {}
 
-  async propose(state: GeometryState, instruction: string): Promise<EditOperation> {
+  async propose(state: GeometryState, instruction: string, jobId?: string): Promise<EditOperation> {
     const { apiKey, model } = getGeminiConfig();
     const client = this.generate ? undefined : new GoogleGenAI({ apiKey });
     const generate = this.generate ?? ((request) => client!.models.generateContent(request));
@@ -40,7 +40,7 @@ export class GeminiEditAgent implements EditAgent {
         throw new UploadError(status === 429 ? 429 : 503, status === 429 ? "EDIT_RATE_LIMITED" : "EDIT_SERVICE_UNAVAILABLE",
           status === 429 ? "The edit service is rate limited. Please wait before trying again." : "The edit service is unavailable. Please try again later.");
       }
-      console.info(JSON.stringify({ event: "gemini_token_usage", callType: "edit_interpreter", attempt,
+      console.info(JSON.stringify({ event: "gemini_token_usage", callType: "edit_interpreter", jobId: jobId ?? null, model, attempt,
         promptTokens: response.usageMetadata?.promptTokenCount ?? null,
         outputTokens: response.usageMetadata?.candidatesTokenCount ?? null,
         totalTokens: response.usageMetadata?.totalTokenCount ?? null }));

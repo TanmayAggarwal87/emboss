@@ -8,7 +8,7 @@ export class DiagramRegionProcessor implements DiagramProcessor {
   constructor(private readonly extractor: DiagramExtractor) {}
 
   async process(document: PdfDocumentHandle, pageIndex: number, box: BoundingBox,
-    maxAttempts: number): Promise<DiagramRegionResult> {
+    maxAttempts: number, jobId?: string): Promise<DiagramRegionResult> {
     let png: Uint8Array;
     try {
       png = document.rasterizeRegion(pageIndex, box);
@@ -16,7 +16,7 @@ export class DiagramRegionProcessor implements DiagramProcessor {
       return failure("DIAGRAM_CROP_FAILED", "This diagram could not be cropped from its PDF page. Other regions can still continue.");
     }
     try {
-      const data = await this.extractor.extract(png, maxAttempts);
+      const data = await this.extractor.extract(png, maxAttempts, jobId);
       if (data.chart_type === "unsupported") {
         return failure("DIAGRAM_UNSUPPORTED", "This region is not a supported bar chart or single-series line graph. Other diagram types and image tables are not supported in v1.");
       }

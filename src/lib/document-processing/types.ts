@@ -63,6 +63,7 @@ export interface RegionClassifier {
     page: RasterizedPage,
     maxValidationAttempts: number,
     signal?: AbortSignal,
+    jobId?: string,
   ): Promise<ClassifiedRegion[]>;
 }
 

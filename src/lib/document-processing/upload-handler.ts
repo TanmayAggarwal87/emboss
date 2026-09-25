@@ -117,7 +117,7 @@ async function processPage(dependencies: UploadDependencies, session: RetrySessi
     let prepared = session.prepared.get(pageNumber);
     if (!prepared) {
       const raster = document.rasterizePage(pageNumber - 1);
-      const classifications = await dependencies.classifier.classify(raster, dependencies.config.maxGeminiValidationAttempts, signal);
+      const classifications = await dependencies.classifier.classify(raster, dependencies.config.maxGeminiValidationAttempts, signal, session.jobId);
       prepared = { raster: { width: raster.width, height: raster.height }, hasTextLayer: raster.hasTextLayer,
         classifications, processed: [] };
       session.prepared.set(pageNumber, prepared);
@@ -134,7 +134,7 @@ async function processPage(dependencies: UploadDependencies, session: RetrySessi
       }
       if (result.type === "diagram") {
         result = { ...result, extracted_data: await dependencies.diagramProcessor.process(document,
-          pageNumber - 1, result.bounding_box, dependencies.config.maxGeminiValidationAttempts) };
+          pageNumber - 1, result.bounding_box, dependencies.config.maxGeminiValidationAttempts, session.jobId) };
         if (result.extracted_data?.kind === "diagram" && result.extracted_data.status === "processed" && dependencies.geometryProcessor) {
           const generated = dependencies.geometryProcessor.process(result.extracted_data.data);
           result = { ...result, geometry: generated.status === "validated" ? generated.geometry : null,

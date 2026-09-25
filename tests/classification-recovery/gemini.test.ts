@@ -83,6 +83,8 @@ test("a temporary 503 followed by success recovers the same page", async (contex
     if (model === undefined) delete process.env.GEMINI_MODEL; else process.env.GEMINI_MODEL = model;
   });
   context.mock.method(globalThis, "fetch", () => { assert.fail("No real Gemini calls in regression tests."); });
+  const logs: string[] = [];
+  context.mock.method(console, "info", (message: string) => { logs.push(message); });
   let calls = 0;
   const delays: number[] = [];
   const classifier = new GeminiRegionClassifier({
@@ -96,7 +98,12 @@ test("a temporary 503 followed by success recovers the same page", async (contex
     async sleep(ms) { delays.push(ms); },
   });
   assert.deepEqual(await classifier.classify({ pageNumber: 1, width: 1000, height: 1000,
-    pngBase64: "fixture", hasTextLayer: true }, 3), []);
+    pngBase64: "fixture", hasTextLayer: true }, 3, undefined, "test-job"), []);
   assert.equal(calls, 2);
   assert.deepEqual(delays, [30_000]);
+  const usage = logs.map((line) => JSON.parse(line) as { event: string; jobId?: string; model?: string })
+    .filter((entry) => entry.event === "gemini_token_usage");
+  assert.equal(usage.length, 1);
+  assert.equal(usage[0].jobId, "test-job");
+  assert.equal(usage[0].model, "fixture-model");
 });
