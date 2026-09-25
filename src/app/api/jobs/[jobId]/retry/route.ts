@@ -3,7 +3,7 @@ import { getUploadDependencies } from "@/lib/document-processing/runtime";
 import { createRetryHandler } from "@/lib/document-processing/upload-handler";
 
 export const runtime = "nodejs";
-export const maxDuration = 600;
+export const maxDuration = 300;
 
 export async function POST(request: Request, context: { params: Promise<{ jobId: string }> }): Promise<Response> {
   try {
