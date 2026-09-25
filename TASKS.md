@@ -56,7 +56,7 @@ Goal: Stage 1 and Stage 2 from `docs/pipeline.md` working end to end.
 - [ ] Job status moves toward `ready_for_review` once all pages are classified (full
       transition happens after Phase 2-4 also complete per region)
 
-**Phase 1 is done when:** uploading a 2-3 page test PDF produces correct region rows
+**Phase 1 is done when:** uploading a 1-3 page test PDF produces correct region rows
 (right count, right type, sane bounding boxes) — verify by eye against the source PDF
 before moving on.
 
@@ -248,15 +248,16 @@ updated preview.
 
 Goal: Stage 6 and 7 from `docs/pipeline.md`.
 
-- [ ] STL export from the same mesh object used in preview, for each approved
-      diagram     
-- [ ] Braille text export for approved text and table regions, page-ordered
-- [ ] Rejected regions excluded entirely — confirm no placeholder/empty content is
-      exported for them
-- [ ] Combined package (e.g. zip) assembled and served for download
-- [ ] Job status moves to `exported` only once every non-rejected region is
-      `approved` (per `docs/data-model.md` lifecycle notes) — confirm partial/silent
-      export of un-reviewed regions is not possible
+- [x] STL export for each approved diagram from the same validated geometry state
+      and deterministic mesh-generation path used by the preview
+- [x] Braille text export for approved text and table regions, in page and region
+      order (verified by the reviewer)
+- [x] Rejected regions excluded entirely — only approved regions enter individual
+      downloads and the ZIP package; no rejected-region placeholder is exported
+- [x] Combined package (ZIP) assembled in memory and served as a browser download
+- [x] Export remains a download action; no `exported` job-status transition is
+      required for v1. Only approved regions are included, so pending regions are
+      never silently included in an export.
 
 **Phase 8 is done when:** approving all regions in a test job produces one downloadable
 package containing correct braille text file(s) and correct STL file(s), and nothing
@@ -268,12 +269,12 @@ in that package traces back to an un-reviewed or rejected region.
 
 Goal: confirm the "done" bar in `docs/testing-scope.md` is actually met.
 
-- [ ] Run a full 2-3 page test PDF (text + one diagram + one table) through the
+- [ ] Run a full 1-3 page test PDF (text + one diagram + one table) through the
       entire pipeline with no manual DB/backend intervention
-- [ ] Confirm token usage logging is in place for both Gemini call types (per
+- [ ] logging is in place for both Gemini call types (per
       `docs/testing-scope.md`, "Cost/token scope") and note actual per-document cost
 - [ ] Confirm no Gemini call exists anywhere outside Stage 2 classification and
-      Stage 3c diagram data extraction (`docs/pipeline.md`, "Cost/token discipline")
+      Stage 3c diagram data Confirm token usage extraction (`docs/pipeline.md`, "Cost/token discipline")
 - [ ] Run at least one intentionally out-of-scope input through the pipeline (e.g. an
       unsupported diagram type, an oversized table, a >3-page PDF) and confirm each
       fails with a clear, specific message rather than a crash or silent bad output

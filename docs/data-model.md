@@ -52,7 +52,7 @@ just don't reach for a persistent storage bucket to solve it, per AGENTS.md §5.
 | `id` | uuid, PK | the unguessable job ID used in the share URL |
 | `status` | enum | `processing` \| `ready_for_review` \| `exported` \| `failed` |
 | `created_at` | timestamp | |
-| `page_count` | int | for the v1 2-3 page scope check |
+| `page_count` | int | for the v1 1-3 page scope check |
 | `error_message` | text, nullable | populated on `failed`, e.g. "diagram too dense for plate size" or "unsupported diagram type" |
 
 ### `regions`

@@ -52,7 +52,7 @@ test("rejects a PDF over 7 MB before opening MuPDF", async () => {
   assert.equal(harness.openCalls(), 0);
 });
 
-test("rejects a PDF outside the 2-3 page scope before job creation", async () => {
+test("rejects a PDF above the 1-3 page scope before job creation", async () => {
   const harness = createHarness({ pageCount: 4 });
   const response = await harness.handler(uploadRequest(validPdfFile()));
 
@@ -60,6 +60,20 @@ test("rejects a PDF outside the 2-3 page scope before job creation", async () =>
   assert.equal((await response.json()).error.code, "PAGE_COUNT_OUT_OF_RANGE");
   assert.equal(harness.createdJobs.length, 0);
   assert.equal(harness.classificationCalls(), 0);
+});
+
+test("accepts a one-page PDF without changing the multi-page workflow", async () => {
+  const harness = createHarness({ pageCount: 1 });
+  const response = await harness.handler(uploadRequest(validPdfFile()));
+  const body = await response.json();
+
+  assert.equal(response.status, 201);
+  assert.deepEqual(harness.createdJobs, [1]);
+  assert.equal(harness.classificationCalls(), 1);
+  assert.equal(harness.insertedRegions.length, 1);
+  assert.equal(harness.insertedRegions[0]?.pageNumber, 1);
+  assert.equal(body.page_count, 1);
+  assert.equal(body.pages.length, 1);
 });
 
 test("limits the sixth upload request from the same IP", async () => {

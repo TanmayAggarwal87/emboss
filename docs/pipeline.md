@@ -31,14 +31,14 @@ PDF upload
 
 ## Stage 1 — Page raster
 
-- Input: uploaded PDF (2-3 pages, v1 scope)
+- Input: uploaded PDF (1-3 pages, v1 scope)
 - Tool: MuPDF
 - Action: render each page to an image (for region classification and diagram crops)
   AND keep the PDF's real text layer accessible for direct extraction later — do not
   discard it just because you've rasterized the page.
 - Check for text layer presence here: if a page has no extractable text layer at all
   (i.e. it's a scanned image), flag it for the OCR fallback path (see Stage 3a note).
-  This should be rare in the 2-3 page test scope but must not silently produce empty
+  This should be rare in the 1-3 page test scope but must not silently produce empty
   output.
 - Output per page: `{ page_number, raster_image, has_text_layer: boolean }`
 

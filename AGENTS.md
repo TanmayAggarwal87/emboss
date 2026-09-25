@@ -15,7 +15,7 @@ contradicts this file, stop and follow this file.
 
 ## 1. What Emboss is
 
-Emboss converts a short PDF document (2-3 pages, v1 scope) into a braille- and
+Emboss converts a short PDF document (1-3 pages, v1 scope) into a braille- and
 tactile-ready output package for blind and low-vision readers:
 
 - Plain text → braille text (via liblouis)
@@ -91,7 +91,7 @@ response just to avoid a failure state.
 
 ## 5. Scope boundaries for v1 — do not silently expand these
 
-- Input: PDFs, 2-3 pages, tested scope. Don't build for arbitrary document length yet.
+- Input: PDFs, 1-3 pages, tested scope. Don't build for arbitrary document length yet.
 - Diagram types supported: **bar charts, single-series line graphs only.**
   Pie charts, multi-series line graphs, scatter plots, molecular/circuit diagrams,
   maps, and 3D drawings are explicitly NOT supported in v1. If a diagram doesn't match

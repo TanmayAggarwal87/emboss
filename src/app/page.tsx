@@ -81,7 +81,7 @@ export default function Home() {
           title: "Document processing failed",
           description:
             data.error?.message ||
-            "The document could not be processed. Check the page errors below, or choose an unencrypted PDF with 2–3 pages.",
+            "The document could not be processed. Check the page errors below, or choose an unencrypted PDF with 1–3 pages.",
         })
         return
       }

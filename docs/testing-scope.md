@@ -8,7 +8,7 @@ not a placeholder to "fix later" unless explicitly noted.
 
 ## Document scope
 
-- **Test inputs are PDFs, 2-3 pages maximum.**
+- **Test inputs are PDFs, 1-3 pages maximum.**
 - Documents will contain a realistic mix of plain text, at least one diagram
   (bar chart or single-series line graph), and optionally a simple table.
 - Do not build pagination, batching, or multi-document upload handling for v1. One
@@ -51,7 +51,7 @@ transcription. See `docs/table-processing-verification.md` for the original Phas
 
 - **No background job queue.** Processing happens synchronously within the request
   lifecycle for this test scope. If processing genuinely proves too slow for a
-  2-3 page document once real testing starts, that's a signal to revisit — not a
+  1-3 page document once real testing starts, that's a signal to revisit — not a
   reason to pre-build queueing infrastructure now.
 - **Bounded Call A recovery only.** At user request, classification retries HTTP
   429/503 after 30 then 90 seconds, with two extra requests shared across validation
@@ -93,7 +93,7 @@ this verifies recovery mechanics, not provider uptime or perception consistency.
 
 - Log Gemini token usage per call during testing (see AGENTS.md §4 for which two call
   types exist) — this is cheap to add now and gives real per-document cost data
-  before any decision about scaling past 2-3 pages.
+  before any decision about scaling past 3 pages.
 - Watch specifically for any Gemini call creeping into a stage that should be
   MuPDF/liblouis/deterministic-only (see `docs/pipeline.md`, "Cost/token discipline"
   section) — this is the most likely place scope quietly expands token cost without
@@ -143,7 +143,7 @@ Physical constraints and rendered output are outside Phase 4 verification.
 
 ## What "done" looks like for v1 testing
 
-A 2-3 page PDF containing plain text, one supported diagram, and optionally one
+A 1-3 page PDF containing plain text, one supported diagram, and optionally one
 simple table can be uploaded and, without any manual intervention beyond the
 review/approve/edit-prompt steps in the UI, produce a downloadable package containing
 correct braille text and a validated, BANA-compliant STL file — end to end, in one

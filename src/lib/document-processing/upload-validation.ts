@@ -78,11 +78,11 @@ export async function readValidatedPdf(
 }
 
 export function validatePageCount(pageCount: number, maxPages: number): void {
-  if (pageCount < 2 || pageCount > maxPages) {
+  if (pageCount < 1 || pageCount > maxPages) {
     throw new UploadError(
       422,
       "PAGE_COUNT_OUT_OF_RANGE",
-      `This PDF has ${pageCount} ${pageCount === 1 ? "page" : "pages"}. Emboss currently supports PDFs with 2 to ${maxPages} pages.`,
+      `This PDF has ${pageCount} ${pageCount === 1 ? "page" : "pages"}. Emboss currently supports PDFs with 1 to ${maxPages} pages.`,
     );
   }
 }
