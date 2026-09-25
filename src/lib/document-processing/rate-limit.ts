@@ -7,6 +7,10 @@ export class UploadRateLimiter {
     return nextCount <= limit;
   }
 
+  remaining(ip: string, limit: number): number {
+    return Math.max(0, limit - (this.requestCounts.get(ip) ?? 0));
+  }
+
   clear(): void {
     this.requestCounts.clear();
   }

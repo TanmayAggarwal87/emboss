@@ -269,13 +269,13 @@ in that package traces back to an un-reviewed or rejected region.
 
 Goal: confirm the "done" bar in `docs/testing-scope.md` is actually met.
 
-- [ ] Run a full 1-3 page test PDF (text + one diagram + one table) through the
+- [x] Run a full 1-3 page test PDF (text + one diagram + one table) through the
       entire pipeline with no manual DB/backend intervention
 - [ ] logging is in place for both Gemini call types (per
       `docs/testing-scope.md`, "Cost/token scope") and note actual per-document cost
 - [ ] Confirm no Gemini call exists anywhere outside Stage 2 classification and
       Stage 3c diagram data Confirm token usage extraction (`docs/pipeline.md`, "Cost/token discipline")
-- [ ] Run at least one intentionally out-of-scope input through the pipeline (e.g. an
+- [x] Run at least one intentionally out-of-scope input through the pipeline (e.g. an
       unsupported diagram type, an oversized table, a >3-page PDF) and confirm each
       fails with a clear, specific message rather than a crash or silent bad output
 - [ ] Re-check `docs/testing-scope.md` "Explicitly not in v1 testing scope" — confirm
@@ -292,3 +292,4 @@ Goal: confirm the "done" bar in `docs/testing-scope.md` is actually met.
   exists; not blocking the phases above
 - Auth, persistent history, file storage buckets — explicitly out of v1, see
   `AGENTS.md` §5
+  

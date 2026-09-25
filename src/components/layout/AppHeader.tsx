@@ -17,8 +17,10 @@ import { Badge } from "@/components/ui/badge"
 
 export function AppHeader({
   onReset,
+  uploadQuota,
 }: {
   onReset?: () => void
+  uploadQuota?: { remaining: number; limit: number } | null
 }) {
   const [howItWorksOpen, setHowItWorksOpen] = useState(false)
   const [standardsOpen, setStandardsOpen] = useState(false)
@@ -57,6 +59,16 @@ export function AppHeader({
 
           {/* Nav Actions */}
           <div className="flex items-center gap-2 sm:gap-3">
+            <span
+              className="shrink-0 rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs font-medium text-neutral-700"
+              role="status"
+              aria-live="polite"
+              aria-label={uploadQuota ? `${uploadQuota.remaining} of ${uploadQuota.limit} upload or retry requests remaining` : "Upload availability is being checked"}
+              title="Uploads and page retries share this per-IP request limit; invalid attempts also count."
+            >
+              {uploadQuota ? `${uploadQuota.remaining}/${uploadQuota.limit}` : "—"}
+              <span className="hidden md:inline"> requests left</span>
+            </span>
             <Button
               variant="ghost"
               size="sm"

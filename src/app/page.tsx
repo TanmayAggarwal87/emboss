@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useRef, useState } from "react"
+import React, { useCallback, useEffect, useRef, useState } from "react"
 import { AppHeader } from "@/components/layout/AppHeader"
 import { WorkflowStepper } from "@/components/layout/WorkflowStepper"
 import { UploadDropzone } from "@/components/upload/UploadDropzone"
@@ -12,12 +12,35 @@ import { ExportView } from "@/components/export/ExportView"
 import { Button } from "@/components/ui/button"
 import { ErrorState } from "@/components/shared/ErrorState"
 import { Badge } from "@/components/ui/badge"
+import { Download } from "lucide-react"
 import type {
   WorkflowStep,
   JobApiResponse,
   PersistedRegionItem,
 } from "@/lib/frontend-types"
 import { withApprovedRegion, withEditedRegion, withRejectedRegion } from "@/lib/review/approval-state"
+
+const samplePdfs = [
+  { file: "emboss_realistic_book_page.pdf", label: "Book page", pages: 1 },
+  { file: "emboss_bar_chart_test.pdf", label: "Bar chart", pages: 2 },
+  { file: "emboss_line_graph_test.pdf", label: "Line graph", pages: 2 },
+  { file: "emboss_table_and_chart_test.pdf", label: "Table and chart", pages: 2 },
+] as const
+
+type UploadQuota = { remaining: number; limit: number }
+
+async function readUploadQuota(): Promise<UploadQuota | null> {
+  try {
+    const response = await fetch("/api/upload", { cache: "no-store" })
+    if (!response.ok) return null
+    const quota: UploadQuota = await response.json()
+    if (!Number.isInteger(quota.limit) || quota.limit < 1 || !Number.isInteger(quota.remaining) ||
+      quota.remaining < 0 || quota.remaining > quota.limit) return null
+    return quota
+  } catch {
+    return null
+  }
+}
 
 const normalizeRegions = (data: JobApiResponse): PersistedRegionItem[] =>
   (data.pages || []).flatMap((page) => (page.regions || []).map((region) => ({
@@ -41,7 +64,18 @@ export default function Home() {
     title: string
     description: string
   } | null>(null)
+  const [uploadQuota, setUploadQuota] = useState<UploadQuota | null>(null)
   const requestIdRef = useRef(0)
+
+  const refreshUploadQuota = useCallback(async () => {
+    setUploadQuota(await readUploadQuota())
+  }, [])
+
+  useEffect(() => {
+    let active = true
+    void readUploadQuota().then((quota) => { if (active) setUploadQuota(quota) })
+    return () => { active = false }
+  }, [])
 
   const handleFileSelect = (file: File) => {
     setSelectedFile(file)
@@ -98,6 +132,7 @@ export default function Home() {
           "Could not communicate with the document analysis service. Please verify your connection and try again.",
       })
     } finally {
+      void refreshUploadQuota()
       if (activeRequest === requestIdRef.current) setIsProcessing(false)
     }
   }
@@ -137,6 +172,7 @@ export default function Home() {
       console.error("Retry error:", err)
       setErrorMessage({ title: "Page retry unavailable", description: "Could not reach the service. Saved results are still available." })
     } finally {
+      void refreshUploadQuota()
       if (activeRequest === requestIdRef.current) setIsRetrying(false)
     }
   }
@@ -214,7 +250,7 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col bg-[#FAFAFA] text-neutral-900 font-sans antialiased">
       {/* Top Application Header */}
-      <AppHeader onReset={handleReset} />
+      <AppHeader onReset={handleReset} uploadQuota={uploadQuota} />
 
       {/* Horizontal Workflow Stepper */}
       <WorkflowStepper currentStep={currentStep} />
@@ -265,6 +301,27 @@ export default function Home() {
                   isProcessing={isProcessing}
                 />
               )}
+              <div className="mt-4 rounded-xl border border-neutral-200 bg-white p-4 shadow-xs">
+                <p className="text-sm font-semibold text-neutral-900">Try a sample PDF</p>
+                <p className="mt-1 text-xs text-neutral-500">Download a sample, then upload it above.</p>
+                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {samplePdfs.map((sample) => (
+                    <a
+                      key={sample.file}
+                      href={`/samples/${sample.file}`}
+                      download={sample.file}
+                      className="flex items-center justify-between gap-3 rounded-lg border border-neutral-200 px-3 py-2.5 text-sm text-neutral-800 transition-colors hover:border-neutral-400 hover:bg-neutral-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
+                      aria-label={`Download ${sample.label} sample PDF, ${sample.pages} ${sample.pages === 1 ? "page" : "pages"}`}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate font-medium">{sample.label}</span>
+                        <span className="block text-xs text-neutral-500">{sample.pages} {sample.pages === 1 ? "page" : "pages"} · PDF</span>
+                      </span>
+                      <Download className="size-4 shrink-0 text-neutral-500" aria-hidden="true" />
+                    </a>
+                  ))}
+                </div>
+              </div>
             </div>
 
             {/* Features & Trust sections */}

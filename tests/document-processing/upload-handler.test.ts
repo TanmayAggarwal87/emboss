@@ -99,6 +99,21 @@ test("limits the sixth upload request from the same IP", async () => {
   assert.equal((await blocked.json()).error.code, "RATE_LIMITED");
 });
 
+test("remaining requests are read-only, per IP, and stop at zero", () => {
+  const limiter = new UploadRateLimiter();
+  assert.equal(limiter.remaining(RATE_LIMIT_TEST_CLIENT_IP, 5), 5);
+  assert.equal(limiter.remaining(RATE_LIMIT_TEST_CLIENT_IP, 5), 5);
+  assert.equal(limiter.consume(RATE_LIMIT_TEST_CLIENT_IP, 5), true);
+  assert.equal(limiter.remaining(RATE_LIMIT_TEST_CLIENT_IP, 5), 4);
+  assert.equal(limiter.remaining(DEFAULT_TEST_CLIENT_IP, 5), 5);
+  for (let requestNumber = 2; requestNumber <= 5; requestNumber += 1) {
+    assert.equal(limiter.consume(RATE_LIMIT_TEST_CLIENT_IP, 5), true);
+  }
+  assert.equal(limiter.remaining(RATE_LIMIT_TEST_CLIENT_IP, 5), 0);
+  assert.equal(limiter.consume(RATE_LIMIT_TEST_CLIENT_IP, 5), false);
+  assert.equal(limiter.remaining(RATE_LIMIT_TEST_CLIENT_IP, 5), 0);
+});
+
 test("creates a processing job and pending rows for every classified region", async () => {
   const harness = createHarness();
   const response = await harness.handler(uploadRequest(validPdfFile()));

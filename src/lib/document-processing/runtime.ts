@@ -22,10 +22,18 @@ const shared = globalThis as typeof globalThis & {
   embossUploadRuntime?: { sessions: RetrySessionStore; rateLimiter: UploadRateLimiter };
 };
 
-export function getUploadDependencies(): UploadDependencies & { sessions: RetrySessionStore } {
-  const runtime = shared.embossUploadRuntime ??= {
+function getRuntime() {
+  return shared.embossUploadRuntime ??= {
     sessions: new RetrySessionStore(), rateLimiter: new UploadRateLimiter(),
   };
+}
+
+export function getUploadRateLimit() {
+  return { rateLimiter: getRuntime().rateLimiter, limit: getPhase1Config().uploadsPerIp };
+}
+
+export function getUploadDependencies(): UploadDependencies & { sessions: RetrySessionStore } {
+  const runtime = getRuntime();
   const grade = getBrailleGrade();
   return {
     ...runtime, config: getPhase1Config(), openPdf,

@@ -36,7 +36,7 @@ component, not a file listing.
 
 | Component | Path | Purpose | Key Props / Variants | Reusable Contexts |
 |---|---|---|---|---|
-| `AppHeader` | `src/components/layout/AppHeader.tsx` | Top application header with brand logo, document title, and live job status | `jobId?: string`, `status?: JobStatus` | Global layout across all workflow steps |
+| `AppHeader` | `src/components/layout/AppHeader.tsx` | Top application header with brand logo, navigation, and remaining upload/retry request count | `onReset?: () => void`, `uploadQuota?: { remaining: number; limit: number } \| null` | Global layout across all workflow steps |
 | `WorkflowStepper` | `src/components/layout/WorkflowStepper.tsx` | 4-step progress stepper (Upload → Processing → Review → Export) | `currentStep: 1 \| 2 \| 3 \| 4`, `onStepClick?: (step) => void` | Global layout, top of every stage view |
 
 ### Upload Stage
