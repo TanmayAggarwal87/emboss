@@ -5,7 +5,7 @@ import { getClientIp } from "@/lib/document-processing/rate-limit";
 
 export const runtime = "nodejs";
 
-export const maxDuration = 600;
+export const maxDuration = 300;
 
 export function GET(request: Request): Response {
   try {
