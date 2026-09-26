@@ -235,14 +235,19 @@ while the original document handle is active. These crops are:
 - **Never sent to Gemini again**: Used exclusively for human review verification in the
   client UI. Sighted reviewers compare the tactile 3D relief or braille formatting
   directly against what was originally printed in the document.
-- **Temporary in-memory cache**: Held in a process-local LRU cache (bounded at 50 MB
-  and 15-minute TTL). They are not stored in Supabase tables, filesystems, or cloud buckets.
+- **Session-local delivery**: Upload/retry responses include PNG data URLs that the
+  browser displays directly, without another server request or model call. Inline
+  crops share a 2 MiB character budget per response; oversized crops receive a clear
+  preview-only error. Browser copies live only in app memory until reset or reload.
+  A bounded server cache (32 MB, 128 entries, 15-minute TTL) remains for legacy URLs.
+  Crops are not stored in Supabase tables, filesystems, or cloud buckets.
 - **HTTP 410 Gone on expiry**: The dedicated endpoint (`/api/jobs/[jobId]/regions/[regionId]/source`)
-  authenticates job/region UUID matching and emits `Cache-Control: private, no-store`.
+  validates job/region UUIDs and emits `Cache-Control: private, no-store`.
   If the TTL expires, the process restarts, or another serverless replica serves the
   request, the endpoint responds with HTTP 410 (Gone). Saved database records and validated
   geometry remain intact; reviewers can still inspect the geometry and compare with their
-  own source document.
+  own source document. The current UI prefers response-delivered crops, so a cache
+  miss on this legacy endpoint does not prevent current-session preview display.
 
 The client preview renders:
 - **Exact mesh object reuse**: The viewer constructs the 3D model using `createPreviewMesh(geometry)`,

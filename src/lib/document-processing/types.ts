@@ -34,7 +34,7 @@ export type PersistedRegion = {
   extracted_data?: TextRegionResult | TableRegionResult | DiagramRegionResult | null;
   geometry?: GeometryState | null;
   // Response-only metadata. Crops never enter database records.
-  source_preview?: { url?: string; expires_at?: string; error?: string };
+  source_preview?: { url?: string; data_url?: string; expires_at?: string; error?: string };
 };
 
 export type RegionToPersist = ClassifiedRegion & {

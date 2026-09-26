@@ -23,6 +23,7 @@ export type ExtractedData = TextExtractedData | TableExtractedData | DiagramExtr
 
 export interface SourcePreview {
   url?: string
+  data_url?: string
   error?: string
   expires_at?: string
 }

@@ -231,6 +231,7 @@ upload and retry API JSON responses (`PersistedRegionItem.source_preview`):
 ```ts
 export interface SourcePreview {
   url?: string;        // e.g. "/api/jobs/<jobId>/regions/<regionId>/source"
+  data_url?: string;   // Response-only PNG; preferred by the current-session UI
   expires_at?: string; // ISO 8601 timestamp (15 minutes from rasterization)
   error?: string;      // Populated if raster crop creation failed
 }
@@ -240,15 +241,21 @@ export interface SourcePreview {
   column. Database rows store only `bounding_box`, `extracted_data`, `geometry`, and
   `review_status`.
 - **Not stored in Supabase Storage**: No storage buckets are used in v1 (`AGENTS.md` §5).
-  The high-resolution PNG bytes are cached strictly in Node.js process memory using a
-  bounded LRU cache (50 MB limit, 15-minute TTL).
+  PNG bytes use a bounded process-local cache (32 MB, 128 entries, 15-minute TTL).
+  Upload/retry responses also deliver PNG data URLs to browser memory. The UI prefers
+  these to avoid depending on a subsequent request reaching the same server instance.
+  They are not written to localStorage/sessionStorage and are cleared with app reset
+  or page reload. Inline crops share a 2 MiB character budget per response; crops
+  exceeding it receive a clear preview-only error without changing saved results.
 - **Temporary URL & Expiry (HTTP 410)**: The URL `/api/jobs/[jobId]/regions/[regionId]/source`
   serves the exact PNG bytes privately (`Cache-Control: private, no-store`). When the
   in-memory TTL expires, or if the server process restarts or another serverless replica
   receives the request, the endpoint returns **HTTP 410 Gone**.
 - **Non-blocking for geometry/review**: Expiry of a source preview does not alter or invalidate
   the region's persisted geometry or review status in Postgres. The review UI cleanly displays
-  an expired notice while preserving 3D tactile inspection.
+  an expired notice for legacy URL-only previews while preserving 3D tactile inspection.
+  Response-delivered crops remain usable in the current browser session even after
+  the server cache expires or another instance handles subsequent requests.
 
 ---
 

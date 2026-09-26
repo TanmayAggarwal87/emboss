@@ -66,7 +66,7 @@ flowchart TD
     V -->|approved regions only| E["Browser export<br/>braille files + STL + ZIP"]
 ```
 
-Processing is synchronous; there is no background queue. PDF bytes and source crops are temporary process-local data, not files in a Supabase Storage bucket. Supabase stores job status and per-region results, including extracted text and validated geometry. Exports are assembled for download rather than stored on the server.
+Processing is synchronous; there is no background queue. PDF bytes stay temporary and process-local; source crops are also delivered to browser memory for the current review session, so preview does not depend on a second request reaching the same server instance. Neither is stored in a Supabase Storage bucket. Supabase stores job status and per-region results, including extracted text and validated geometry. Exports are assembled for download rather than stored on the server.
 
 ## Built with
 
@@ -177,7 +177,7 @@ These test suites use fixtures/injected model responses and do not spend Gemini 
 - **One chart, one STL.** The browser exports the validated chart mesh to an STL for a standard FDM slicer. Braille text and tables are separate files, not combined into a page-wide STL.
 - **Braille-file compatibility:** Current `.brf` downloads contain Unicode braille text. Check or convert the encoding for your specific braille embosser before printing; the extension alone does not prove device-ready BRF compatibility.
 - **Software validation is not physical certification.** Tactile checks use [BANA/NLS-derived rules and a separately identified Emboss manufacturing profile](docs/bana-standards.md). A real print still needs slicer inspection and testing with tactile readers.
-- **Session-bound preview and retry:** Source crops and retry PDFs are held temporarily in one Node process (normally up to 15 minutes). Restarts or another server instance can make them unavailable even when saved job/region rows remain. Deploy on a long-lived Node process with sufficient request duration and trustworthy client-IP headers; independently scaled serverless instances do not share this state.
+- **Session-bound preview and retry:** Source crops are delivered to browser memory for the current review session and disappear on reset/reload. Inline preview payloads are bounded; unusually large crops may require comparison with the original PDF. Failed-page retry PDFs/checkpoints still live temporarily in one Node process (normally up to 15 minutes), so a restart or another instance can make retries unavailable even when saved job/region rows remain. Independently scaled serverless instances do not share retry state; use trustworthy client-IP headers and sufficient request duration.
 - **No accounts or permanent file bucket:** The app has no login or persistent job-history UI. PDFs, rasters, and ZIP exports are not stored in Supabase Storage, but Supabase **does retain** job/region records, including extracted content, until those rows are cleaned up. Do not upload sensitive documents without considering that retention and the link-based access model.
 
 ## Project documents

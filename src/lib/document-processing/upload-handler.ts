@@ -9,6 +9,7 @@ import type { GeometryProcessor } from "../tactile-geometry/types.ts";
 import type { JobRepository, PdfDocumentHandle, Phase1Config, RegionClassifier, RegionToPersist } from "./types.ts";
 import { readValidatedPdf, validatePageCount } from "./upload-validation.ts";
 import type { SourcePreviewStore } from "../preview/source-preview.ts";
+import { boundSourcePreviews, MAX_INLINE_PREVIEW_CHARACTERS } from "../preview/source-preview-payload.ts";
 
 export type UploadDependencies = {
   config: Phase1Config;
@@ -200,13 +201,19 @@ async function syncJobStatus(repository: JobRepository, session: RetrySession, g
   }
 }
 
+function responsePages(session: RetrySession) {
+  const previewBudget = { remaining: MAX_INLINE_PREVIEW_CHARACTERS };
+  return session.pages.map((page) => page.status === "classified"
+    ? { ...page, regions: boundSourcePreviews(page.regions, previewBudget) } : page);
+}
+
 function sessionResponse(session: RetrySession, sessions: RetrySessionStore, retry: boolean): Response {
   const failed = jobFailed(session);
   const partial = session.pages.some((page) => page.status === "failed" ||
     [page.text_processing, page.table_processing, page.diagram_processing, page.geometry_processing].includes("partial_failure"));
   const retryable = session.pages.filter((page) => page.status === "failed" && page.retryable).map((page) => page.page_number);
   return Response.json({ job_id: session.jobId, status: failed ? "failed" : session.reviewReady ? "ready_for_review" : "processing",
-    page_count: session.pageCount, pages: session.pages,
+    page_count: session.pageCount, pages: responsePages(session),
     retry: { url: `/api/jobs/${session.jobId}/retry`, eligible_pages: retryable,
       expires_at: new Date(session.expiresAt).toISOString(), remaining_requests: MAX_MANUAL_RETRIES - session.retries,
       available_after: new Date(Math.max(sessions.now(), session.retryNotBefore)).toISOString() },
@@ -283,7 +290,7 @@ function pageFailure(error: unknown, page: number, aborted: boolean): FailedPage
 
 function errorResponse(error: unknown, session?: RetrySession): Response {
   const known = error instanceof UploadError;
-  return Response.json({ ...(session?.jobId ? { job_id: session.jobId, pages: session.pages,
+  return Response.json({ ...(session?.jobId ? { job_id: session.jobId, pages: responsePages(session),
     retry_url: `/api/jobs/${session.jobId}/retry` } : {}), error: { code: known ? error.code : "UPLOAD_FAILED",
     message: known ? error.message : "The document could not be processed. Please try again." } },
   { status: known ? error.status : 500, headers: { "Cache-Control": "no-store",

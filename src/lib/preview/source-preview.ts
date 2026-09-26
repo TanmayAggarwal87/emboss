@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 
-export type SourcePreview = { url?: string; expires_at?: string; error?: string };
+export type SourcePreview = { url?: string; data_url?: string; expires_at?: string; error?: string };
 type Entry = { bytes: Uint8Array; expiresAt: number; timer: ReturnType<typeof setTimeout> };
 
 /** Temporary crops only: no PDF retention, disk writes, database or model access. */
@@ -39,7 +39,9 @@ export class SourcePreviewStore {
   }
 
   private metadata(jobId: string, regionId: string, expiresAt: number): SourcePreview {
+    const bytes = this.entries.get(this.key(jobId, regionId))!.bytes;
     return { url: `/api/jobs/${encodeURIComponent(jobId)}/regions/${encodeURIComponent(regionId)}/source`,
+      data_url: `data:image/png;base64,${Buffer.from(bytes).toString("base64")}`,
       expires_at: new Date(expiresAt).toISOString() };
   }
   private now() { return (this.options.now ?? Date.now)(); }

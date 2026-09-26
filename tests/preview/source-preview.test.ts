@@ -1,16 +1,57 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { SourcePreviewStore, sourcePreviewResponse } from "../../src/lib/preview/source-preview.ts";
+import { SourcePreviewStore, sourcePreviewResponse, type SourcePreview } from "../../src/lib/preview/source-preview.ts";
 import { openPdf } from "../../src/lib/document-processing/pdf.ts";
 import { createUploadHandler } from "../../src/lib/document-processing/upload-handler.ts";
 import { UploadRateLimiter } from "../../src/lib/document-processing/rate-limit.ts";
 import { RetrySessionStore } from "../../src/lib/document-processing/retry-sessions.ts";
 import { createDiagramFixture, CHART_BOX } from "../diagram-extraction/fixtures.ts";
 import type { RegionToPersist } from "../../src/lib/document-processing/types.ts";
+import { resolveSourcePreviewUrl, boundSourcePreviews, MAX_INLINE_PREVIEW_CHARACTERS } from "../../src/lib/preview/source-preview-payload.ts";
 
 const JOB = "12345678-1234-4234-8234-123456789abc";
 const REGION = "12345678-1234-8234-8234-123456789abc";
 const OTHER = "12345678-1234-4234-8234-123456789def";
+
+test("source crop remains usable from upload response on a different server instance", () => {
+  const store = new SourcePreviewStore();
+  const png = new Uint8Array([137, 80, 78, 71]);
+  const metadata = store.put(JOB, REGION, png);
+  const otherInstance = new SourcePreviewStore();
+  assert.equal(sourcePreviewResponse(otherInstance, JOB, REGION).status, 410);
+  assert.equal(metadata.data_url,
+    `data:image/png;base64,${Buffer.from(png).toString("base64")}`);
+  assert.equal(resolveSourcePreviewUrl(metadata, "https://emboss.test"), metadata.data_url);
+});
+
+test("inline source survives cache expiry, while legacy route and error handling remain supported", () => {
+  let now = 0;
+  const store = new SourcePreviewStore({ now: () => now, ttlMs: 1 });
+  const preview = store.put(JOB, REGION, new Uint8Array([137, 80, 78, 71]));
+  now = 2;
+  assert.equal(sourcePreviewResponse(store, JOB, REGION).status, 410);
+  assert.equal(resolveSourcePreviewUrl(preview, "https://emboss.test"), preview.data_url);
+  assert.equal(resolveSourcePreviewUrl({ url: "/api/source" }, "https://emboss.test"), "https://emboss.test/api/source");
+  assert.throws(() => resolveSourcePreviewUrl({ url: "https://other.test/image.png" }, "https://emboss.test"));
+  for (const data_url of ["data:text/html;base64,PHNjcmlwdD4=", "data:image/png;base64,!!!", "data:image/png;base64,", "data:image/png;base64," + "A".repeat(MAX_INLINE_PREVIEW_CHARACTERS)]) {
+    assert.throws(() => resolveSourcePreviewUrl({ data_url }, "https://emboss.test"));
+  }
+  assert.throws(() => resolveSourcePreviewUrl({ error: "Fixture rendering failed" }, "https://emboss.test"), /Fixture rendering failed/);
+});
+
+test("preview payload is bounded across pages without changing session metadata or results", () => {
+  const region: { id: string; geometry: { unchanged: boolean }; source_preview: SourcePreview } = {
+    id: REGION, geometry: { unchanged: true }, source_preview: { data_url: "data:image/png;base64,iVBORw==", url: "/api/source" },
+  };
+  const budget = { remaining: region.source_preview.data_url!.length };
+  assert.equal(boundSourcePreviews([region], budget)[0], region);
+  const omitted = boundSourcePreviews([region], budget)[0];
+  assert.match(omitted.source_preview.error!, /response limit/);
+  assert.equal(omitted.source_preview.data_url, undefined);
+  assert.equal(omitted.source_preview.url, undefined);
+  assert.equal(omitted.geometry, region.geometry);
+  assert.ok(region.source_preview.data_url);
+});
 
 test("temporary crops isolate job/region access, expire, and release bounded capacity", () => {
   let now = 1000;
@@ -71,6 +112,11 @@ test("upload exposes original crops after PDF release without putting previews i
   assert.equal(response.status, 422);
   assert.ok(body.pages[0].regions[0].source_preview.url);
   assert.ok(body.pages[1].regions[0].source_preview.url);
+  for (const page of body.pages) {
+    const preview = page.regions[0].source_preview;
+    assert.equal(resolveSourcePreviewUrl(preview, "https://emboss.test"), preview.data_url);
+    assert.deepEqual(Buffer.from(preview.data_url.split(",")[1], "base64"), Buffer.from(store.get(JOB, page.regions[0].id)!));
+  }
   assert.equal(sessions.get(JOB).bytes, null);
   assert.ok(saved.every((row) => !("source_preview" in row)));
   assert.equal(sourcePreviewResponse(store, JOB, REGION).status, 200);

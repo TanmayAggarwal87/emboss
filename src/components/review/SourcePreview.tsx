@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { RotateCw, ZoomIn, ZoomOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { PersistedRegionItem } from "@/lib/frontend-types"
+import { resolveSourcePreviewUrl } from "@/lib/preview/source-preview-payload"
 
 type ImageState = { status: "loading" } | { status: "ready"; url: string } | { status: "error"; message: string }
 
@@ -12,6 +13,7 @@ export function SourcePreview({ region, className }: { region: PersistedRegionIt
   const [attempt, setAttempt] = useState(0)
   const [image, setImage] = useState<ImageState>({ status: "loading" })
   const sourceUrl = region.source_preview?.url
+  const sourceDataUrl = region.source_preview?.data_url
   const sourceError = region.source_preview?.error
 
   useEffect(() => {
@@ -22,9 +24,11 @@ export function SourcePreview({ region, className }: { region: PersistedRegionIt
       setImage({ status: "loading" })
       setZoom(1)
       try {
-        if (!sourceUrl) throw new Error(sourceError || "Source crop is not available for this region. Refer to your original PDF.")
-        const url = new URL(sourceUrl, window.location.origin)
-        if (url.origin !== window.location.origin) throw new Error("The source preview address is invalid.")
+        const url = resolveSourcePreviewUrl({ url: sourceUrl, data_url: sourceDataUrl, error: sourceError }, window.location.origin)
+        if (url.startsWith("data:image/png;base64,")) {
+          setImage({ status: "ready", url })
+          return
+        }
         const response = await fetch(url, { cache: "no-store", signal: controller.signal })
         if (response.status === 410) throw new Error("This temporary source crop has expired or is unavailable. Refer to your original PDF; generated results are still available.")
         if (!response.ok || !response.headers.get("content-type")?.startsWith("image/png")) {
@@ -42,13 +46,13 @@ export function SourcePreview({ region, className }: { region: PersistedRegionIt
       controller.abort()
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [sourceUrl, sourceError, attempt])
+  }, [sourceUrl, sourceDataUrl, sourceError, attempt])
 
   return (
     <div className={`relative flex min-w-0 flex-col overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50 ${className ?? ""}`}>
       <div className="relative h-[380px] w-full overflow-auto bg-neutral-100/60 p-6">
         {image.status === "ready" ? (
-          // Blob URLs are temporary and must bypass the persistent image optimizer.
+          // Response-delivered crops/Blob URLs bypass the persistent image optimizer.
           // eslint-disable-next-line @next/next/no-img-element
           <img src={image.url} alt={`Source crop for page ${region.page_number}, ${region.type} region`}
             onError={() => setImage({ status: "error", message: "The source image could not be displayed. Try loading the crop again." })}
@@ -59,7 +63,7 @@ export function SourcePreview({ region, className }: { region: PersistedRegionIt
         ) : (
           <div className="p-6 text-center text-sm text-neutral-600">
             <p role="alert">{image.message}</p>
-            {sourceUrl && <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setAttempt((value) => value + 1)}>Retry crop</Button>}
+            {(sourceUrl || sourceDataUrl) && <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setAttempt((value) => value + 1)}>Retry crop</Button>}
           </div>
         )}
       </div>
