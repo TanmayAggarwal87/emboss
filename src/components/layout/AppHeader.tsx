@@ -87,7 +87,7 @@ export function AppHeader({
             </Button>
             <div className="h-4 w-[1px] bg-neutral-200 mx-1 hidden sm:block" />
             <a
-              href="https://github.com"
+              href="https://github.com/TanmayAggarwal87/emboss"
               target="_blank"
               rel="noopener noreferrer"
               className="hidden sm:inline-flex"
